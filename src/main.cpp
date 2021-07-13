@@ -91,7 +91,9 @@ int PreviousEncoderState[3];
 OneWire oneWire(ONE_WIRE_BUS);
 float tempC;
 DallasTemperature temper(&oneWire);
-int bcount = -1;
+int bcount = 0;
+int counter = 0;
+
 // hour, min, temper
 int NumberSpecialSensors = 3;
 // all variables
@@ -153,6 +155,8 @@ unsigned long frucuenTrans;
 int PreviousSensorState[leng];
 int CurrentSensorState[leng];
 int NewSensorState[leng];
+int index[leng];
+int key = 1;
 int flag;
 bool LedFlag = 0;
 bool LcdFlag;
@@ -185,6 +189,7 @@ int statistic[10];
 int temporaryVar;
 // period of sensors checking
 unsigned long SensorsCheck;
+
 String WaterMenuValue(int j)
 {
   switch (j)
@@ -307,12 +312,14 @@ void SensorsRequest()
         CurrentSensorState[19 + (i - 53) / 4] = 1;
         digitalWrite(OutputSensors[(i - 53) / 4], HIGH);
         flag = 1;
+        Serial.println("two");
       }
       else if (CurrentSensorState[i + 2] == CurrentSensorState[0] && CurrentSensorState[i + 3] == CurrentSensorState[1])
       {
         CurrentSensorState[19 + (i - 53) / 4] = 0;
         digitalWrite(OutputSensors[(i - 53) / 4], LOW);
         flag = 1;
+        Serial.println("tree");
       }
     }
   }
@@ -320,7 +327,18 @@ void SensorsRequest()
   {
     OneSensorsRequest(i);
     if (CurrentSensorState[NumberSpecialSensors + i] != PreviousSensorState[NumberSpecialSensors + i])
-      flag = 1;
+    {
+
+      /* flag = 1;
+      Serial.print("four  ");
+      Serial.print("  NumberSpecialSensors + i  ");
+      Serial.print(NumberSpecialSensors + i);
+      Serial.print("  CurrentSensorState[ + i]  ");
+      Serial.print(CurrentSensorState[NumberSpecialSensors + i]);
+      Serial.print("  PreviousSensorState[ + i]  ");
+      Serial.println(PreviousSensorState[NumberSpecialSensors + i]);
+    */
+    }
   }
   // tank adjust
   if (CurrentSensorState[177] > 0)
@@ -357,7 +375,7 @@ void SensorsRequest()
     {
 
       Serial.println("turn stepper");
-      
+
       digitalWrite(enable1, LOW);
       delay(500);
       stepper1.setCurrentPosition(0);
@@ -393,7 +411,7 @@ void SensorsRequest()
       digitalWrite(OutputSensors[4], LOW);  // close valve
       TankFlag++;
       delay(300);
-      
+
       // 7
     }
     if (digitalRead(InputSensors[2]) && TankFlag == 7 && CurrentSensorState[170] > 0) // drain water
@@ -468,12 +486,12 @@ void SensorsRequest()
   }
   if (CurrentSensorState[1] == EventMin && CurrentSensorState[0] == EventHour && CurrentDay == EventDay && TankFlag == 14 && CurrentSensorState[169] > 0)
   {
-delay(500);
+    delay(500);
     Serial.println("waterring");
     digitalWrite(OutputSensors[10], LOW);  // stop mixing
     digitalWrite(OutputSensors[11], HIGH); // water all
     delay(500);
-    digitalWrite(OutputSensors[5], HIGH);  // open correct valve
+    digitalWrite(OutputSensors[5], HIGH); // open correct valve
     EventTimeUpdate(CurrentSensorState[169]);
     TankFlag++;
     delay(500);
@@ -1027,6 +1045,7 @@ void receiveEvent()
     }
     TimeFromBegin = millis();
     flag = 1;
+    Serial.println("thix");
   }
   (number == leng - 1) ? number = 0 : number++;
 }
@@ -1034,31 +1053,43 @@ void receiveEvent()
 // Send date to Master
 void requestEvent()
 {
+  // Define a byte to hold data
   byte bval;
-  (bcount == -1) ? bval = 255 : bval = CurrentSensorState[bcount];
-  Wire.write(bval);
-  if (bval=255){
-    Wire.write(bval);
-    Wire.write(bval);
-  }
-  if (bcount == -1)
+  // Cycle through data
+  // First response is always 255 to mark beginning
+  switch (bcount)
   {
-    Serial.println("I start translate date to Master");
-  }
-  if (bcount == leng - 1)
-  {
-    for (int i = 0; i < leng; i++)
+  case 0:
+    bval = 255; // start key
+    Serial.println();
+    Serial.println("Start translate");
+    break;
+  default:
+    if ((bcount - 1) % 2 == 0 && bcount != key) //0,2,4,6,8
     {
-      Serial.print(" ");
-      Serial.print(CurrentSensorState[i]);
+      counter = (bcount - 1) / 2;
+      bval = index[counter];
     }
-    Serial.println(" ");
-    Serial.println("I success finished translate date to Master");
-    digitalWrite(PinForMaster, LOW);
-    delay(100);
+    else if (bcount != key) //  1,3,5,7
+    {
+      counter = ((bcount - 1) - 1) / 2;
+      bval = CurrentSensorState[index[counter]];
+    }
+    else if (bcount == key)
+    {
+      key = 1;
+      bval = 254;
+      Serial.println(bval);
+      Serial.println("Finish translate");
+    }
+    Serial.print(bval);
+    Serial.print(" ");
+    break;
   }
-
-  (bcount == leng - 1) ? bcount = -1 : bcount++;
+  Wire.write(bval);
+  bcount = bcount + 1;
+  if (bcount > key)
+    bcount = 0;
 }
 
 void setup()
@@ -1094,13 +1125,14 @@ void setup()
   Wire.begin(SLAVE_ADDR);
   Wire.onReceive(receiveEvent); // Get date from Master
   Wire.onRequest(requestEvent); // Send date to Master
-
+  CurrentSensorState[leng - 2] = 233;
+  CurrentSensorState[leng - 1] = 254;
   for (int i = 0; i < leng; i++)
   {
     Serial.print(CurrentSensorState[i]);
     Serial.print(" ");
   }
-
+  Serial.println();
   Serial.println("Setup end");
   lcd.init();
   lcd.backlight();
@@ -1110,7 +1142,7 @@ void setup()
 
 void loop()
 {
-  if (millis() - sec > 400 && FirstTimeFlag)
+  if (millis() - sec > 200)
   {
     sec = millis();
     DateTime now = rtc.now();
@@ -1124,8 +1156,8 @@ void loop()
     SensorsRequest();
     if (CurrentSensorState[1] != PreviousSensorState[1] && CurrentSensorState[1] < 60 && CurrentSensorState[1] > -1 && ZeroSensor < 60)
     {
-
       flag = 1;
+      Serial.println("ethgh");
       // if cycle start
       if (CurrentSensorState[1] == CurrentSensorState[168] && CurrentSensorState[0] == CurrentSensorState[167] && CurrentDay == CurrentSensorState[166])
       {
@@ -1304,6 +1336,7 @@ void loop()
       CurrentSensorState[168] = future.minute();
       MenuCount = 3;
       flag = 1;
+      Serial.println("twelve");
     }
     else if (MenuCount == 3 && CurrentEncoderState[0] == 2) // change cycle
     {
@@ -1414,41 +1447,30 @@ void loop()
     LcdFlag = 1;
   }
 
-  if (flag == 1 && FirstTimeFlag == 1)
+  if (flag == 1)
   {
-    Serial.print("Translate date to ESP  ");
+    Serial.println("Something has changed  ");
+    key = 0;
     for (int i = 0; i < leng; i++)
     {
       if (CurrentSensorState[i] != PreviousSensorState[i])
       {
         PreviousSensorState[i] = CurrentSensorState[i];
-        flag = 3;
+        index[key] = i;
+        key++;
         LcdFlag = 1;
       }
+      Serial.print(CurrentSensorState[i]);
+      Serial.print("_");
     }
-    Serial.println("Sended data to ESP");
-    if (flag == 3 && millis() )//- frucuenTrans > 500
-    {
-      digitalWrite(PinForMaster, HIGH);
-      frucuenTrans = millis();
-    }
-    sec2 = millis();
-    flag = 2;
-  Serial.print("TankFlag  ");
-    Serial.println(TankFlag);
-    
+    key = key * 2 + 1;
+    Serial.println();
+    flag = 0;
   }
   if (LcdFlag && (millis() - TimeFromBegin) > 150)
   {
     LCD_request();
     LcdFlag = 0;
-    TimeFromBegin=millis();
-  }
-
-  if (millis() - sec2 > 10)
-  {
-    sec2 = millis();
-    digitalWrite(PinForMaster, LOW);
-    flag = 0;
+    TimeFromBegin = millis();
   }
 }
