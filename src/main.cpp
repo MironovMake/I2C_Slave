@@ -94,6 +94,7 @@ DallasTemperature temper(&oneWire);
 int bcount = 0;
 int counter = 0;
 
+// NumberSpecialSensors=3
 // hour, min, temper
 int NumberSpecialSensors = 3;
 // all variables
@@ -167,7 +168,7 @@ unsigned long sec, sec1, sec2;
 int n, m;
 int value;
 // wait till esp send first datesadDS
-bool FirstTimeFlag = 0;
+int FirstTimeFlag = 0;
 // pin 57
 int LED = 57;
 int CurrentDay;
@@ -185,7 +186,6 @@ String adr;
 String ValueOfOneString;
 String ValueOfLedString;
 int TankFlag = 50;
-int statistic[10];
 int temporaryVar;
 // period of sensors checking
 unsigned long SensorsCheck;
@@ -241,43 +241,12 @@ String LedMenuValue(int j)
   }
   return ValueOfLedString;
 }
-
-void SensorsInit()
-{
-  pinMode(enable1, OUTPUT);
-  pinMode(enable2, OUTPUT);
-  digitalWrite(enable1, HIGH);
-  digitalWrite(enable2, HIGH);
-  pinMode(PinForMaster, OUTPUT);
-  digitalWrite(PinForMaster, LOW);
-  for (int i = 0; i < InputNumber; i++)
-  {
-    pinMode(InputSensors[i], INPUT);
-    CurrentSensorState[NumberSpecialSensors + i] = digitalRead(InputSensors[i]);
-  }
-  for (int i = 0; i < OutputNumber; i++)
-  {
-    pinMode(OutputSensors[i], OUTPUT);
-    CurrentSensorState[1 + NumberSpecialSensors + InputNumber + i] = 0;
-  }
-  pinMode(LED, OUTPUT);
-}
-
-void EventTimeUpdate(int some)
-{
-  DateTime future(rtc.now() + TimeSpan(0, 0, some, 0));
-  EventDay = future.day();
-  EventHour = future.hour();
-  EventMin = future.minute();
-}
 int OneSensorsRequest(int temporary)
 {
+  int statistic[10];
   for (int j = 0; j < 10; j++)
   {
-    if (temporary == 0)
-      statistic[j] = !digitalRead(InputSensors[temporary]);
-    else
-      statistic[j] = digitalRead(InputSensors[temporary]);
+    (temporary == 0 || temporary == 6 || temporary == 7 || temporary == 8 || temporary == 9) ? statistic[j] = !digitalRead(InputSensors[temporary]) : statistic[j] = digitalRead(InputSensors[temporary]);
   }
   for (int k = 0; k < 10; k++) // sort
   {
@@ -298,6 +267,40 @@ int OneSensorsRequest(int temporary)
   }
   return CurrentSensorState[NumberSpecialSensors + temporary] = round(temporaryVar / 6);
 }
+
+void SensorsInit()
+{
+  // pins for control step motors
+  pinMode(enable1, OUTPUT);
+  pinMode(enable2, OUTPUT);
+  // Switch off power of step motors
+  digitalWrite(enable1, HIGH);
+  digitalWrite(enable2, HIGH);
+
+  pinMode(PinForMaster, OUTPUT);
+  digitalWrite(PinForMaster, LOW);
+  for (int i = 0; i < InputNumber; i++)
+  {
+    pinMode(InputSensors[i], INPUT);
+    (i == 6 || i == 7 || i == 8 || i == 9) ? pinMode(InputSensors[i], INPUT_PULLUP) : pinMode(InputSensors[i], INPUT);
+    OneSensorsRequest(i);
+  }
+  for (int i = 0; i < OutputNumber; i++)
+  {
+    pinMode(OutputSensors[i], OUTPUT);
+    CurrentSensorState[1 + NumberSpecialSensors + InputNumber + i] = 0;
+  }
+  pinMode(LED, OUTPUT);
+}
+
+void EventTimeUpdate(int some)
+{
+  DateTime future(rtc.now() + TimeSpan(0, 0, some, 0));
+  EventDay = future.day();
+  EventHour = future.hour();
+  EventMin = future.minute();
+}
+
 // Here I override CurrentSensorState according sensors
 void SensorsRequest()
 {
@@ -325,19 +328,11 @@ void SensorsRequest()
   }
   for (int i = 0; i < InputNumber; i++)
   {
-    OneSensorsRequest(i);
+    CurrentSensorState[NumberSpecialSensors + i] = OneSensorsRequest(i);
     if (CurrentSensorState[NumberSpecialSensors + i] != PreviousSensorState[NumberSpecialSensors + i])
     {
-
-      /* flag = 1;
-      Serial.print("four  ");
-      Serial.print("  NumberSpecialSensors + i  ");
-      Serial.print(NumberSpecialSensors + i);
-      Serial.print("  CurrentSensorState[ + i]  ");
-      Serial.print(CurrentSensorState[NumberSpecialSensors + i]);
-      Serial.print("  PreviousSensorState[ + i]  ");
-      Serial.println(PreviousSensorState[NumberSpecialSensors + i]);
-    */
+      flag = 1;
+      Serial.println("four  ");
     }
   }
   // tank adjust
@@ -1001,6 +996,7 @@ void LCD_request()
     break;
   }
 }
+
 // Get date from Master
 void receiveEvent()
 {
@@ -1019,28 +1015,42 @@ void receiveEvent()
   }
   if (number == 0)
   {
+    Serial.println();
     Serial.println("I start to getting date from Master");
   }
   Serial.print(value);
   Serial.print(" ");
   if (value == 254)
   {
-    if (FirstTimeFlag == 1)
+    if (FirstTimeFlag > 0)
     {
       // i increase value ig degree becouse i afraid its gona be too big
-      Serial.println(" ");
       for (int i = 0; i < number; i = i + 2)
       {
         CurrentSensorState[NewSensorState[i]] = NewSensorState[i + 1];
+        if (FirstTimeFlag == 1)
+          PreviousSensorState[NewSensorState[i]] = CurrentSensorState[NewSensorState[i]];
       }
+      Serial.println();
+      Serial.println("CurrentSensorState after master");
+      for (int i = 0; i < leng; i++)
+      {
+        Serial.print(" ");
+        Serial.print(CurrentSensorState[i]);
+      }
+      Serial.println();
       Serial.println("I success finished getting date from Master");
+      FirstTimeFlag++;
       //flag = 0;
     }
     else if (FirstTimeFlag == 0)
     {
       FirstTimeFlag = 1;
+      Serial.println();
       Serial.print("adr  ");
-      Serial.println(adr);
+      Serial.println(SetupMenu[0]);
+      delay(1000);
+
       //TimeFromBegin = millis();
     }
     TimeFromBegin = millis();
@@ -1060,9 +1070,10 @@ void requestEvent()
   switch (bcount)
   {
   case 0:
+    digitalWrite(PinForMaster, LOW);
     bval = 255; // start key
-    Serial.println();
-    Serial.println("Start translate");
+    if (key != 1)
+      Serial.println("Translation begin");
     break;
   default:
     if ((bcount - 1) % 2 == 0 && bcount != key) //0,2,4,6,8
@@ -1077,14 +1088,23 @@ void requestEvent()
     }
     else if (bcount == key)
     {
+      if (key != 1)
+      {
+        Serial.println(254);
+        Serial.println("Translation stop");
+      }
       key = 1;
       bval = 254;
-      Serial.println(bval);
-      Serial.println("Finish translate");
     }
+
+    break;
+  }
+  if (key != 1)
+  {
     Serial.print(bval);
     Serial.print(" ");
-    break;
+    if (bcount == key)
+      Serial.println("Translation stop");
   }
   Wire.write(bval);
   bcount = bcount + 1;
@@ -1094,9 +1114,11 @@ void requestEvent()
 
 void setup()
 {
-  SensorsInit();
   Serial.begin(115200);
+  delay(100);
   Serial.println("arduino Mega Start");
+
+  SensorsInit();
 
   while (!Serial)
     ; // for Leonardo/Micro/Zero
@@ -1115,7 +1137,6 @@ void setup()
   //rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   temper.begin();
   enc1.setType(TYPE2);
-
   stepper1.setMaxSpeed(600);
   stepper2.setMaxSpeed(600);
   stepper3.setMaxSpeed(600);
@@ -1142,329 +1163,340 @@ void setup()
 
 void loop()
 {
-  if (millis() - sec > 200)
+  if (FirstTimeFlag > 1)
   {
-    sec = millis();
-    DateTime now = rtc.now();
-    CurrentDay = now.day();
-    ZeroSensor = now.second();
-    CurrentSensorState[0] = now.hour();
-    CurrentSensorState[1] = now.minute();
-    CurrentYear = now.year();
-    CurrentMonth = now.month();
-    SetupMenu[1] = String(now.year()) + "." + String(CurrentDay) + "." + String(now.month()) + "  " + String(PreviousSensorState[0]) + ":" + String(PreviousSensorState[1]);
-    SensorsRequest();
-    if (CurrentSensorState[1] != PreviousSensorState[1] && CurrentSensorState[1] < 60 && CurrentSensorState[1] > -1 && ZeroSensor < 60)
+
+    if (millis() - sec > 200 && value == 254)
     {
-      flag = 1;
-      Serial.println("ethgh");
-      // if cycle start
-      if (CurrentSensorState[1] == CurrentSensorState[168] && CurrentSensorState[0] == CurrentSensorState[167] && CurrentDay == CurrentSensorState[166])
+      sec = millis();
+      DateTime now = rtc.now();
+      CurrentDay = now.day();
+      ZeroSensor = now.second();
+      CurrentSensorState[0] = now.hour();
+      CurrentSensorState[1] = now.minute();
+      CurrentYear = now.year();
+      CurrentMonth = now.month();
+      SetupMenu[1] = String(now.year()) + "." + String(CurrentDay) + "." + String(now.month()) + "  " + String(PreviousSensorState[0]) + ":" + String(PreviousSensorState[1]);
+      SensorsRequest();
+      if (CurrentSensorState[1] != PreviousSensorState[1] && CurrentSensorState[1] < 60 && CurrentSensorState[1] > -1 && ZeroSensor < 60)
       {
+        flag = 1;
+        Serial.println("ethgh");
+        // if cycle start
+        if (CurrentSensorState[1] == CurrentSensorState[168] && CurrentSensorState[0] == CurrentSensorState[167] && CurrentDay == CurrentSensorState[166])
+        {
+          DateTime future(rtc.now() + TimeSpan(CurrentSensorState[174], CurrentSensorState[175], 0, 0));
+          CurrentSensorState[166] = future.day();
+          CurrentSensorState[167] = future.hour();
+          CurrentSensorState[168] = future.minute();
+          TankFlag = 0;
+        }
+        delay(100);
+        temper.requestTemperatures();                      // Send the command to get temperatures
+        CurrentSensorState[2] = temper.getTempCByIndex(0); // temperature
+        delay(100);
+      }
+    }
+
+    enc1.tick();
+    if (enc1.isRight())
+    {
+      CurrentEncoderState[0]--;
+      if (MenuCount == 0 && CurrentEncoderState[0] < 1)
+      {
+        CurrentEncoderState[0] = MenuItems[MenuCount + 1];
+      }
+      else if (CurrentEncoderState[0] < 0 && MenuCount != 0)
+      {
+        CurrentEncoderState[0] = MenuItems[MenuCount + 1];
+      }
+      LcdFlag = 1;
+    }
+
+    if (enc1.isLeft())
+    {
+      CurrentEncoderState[0]++;
+      if (CurrentEncoderState[0] > MenuItems[MenuCount + 1])
+      {
+        if (MenuCount == 0)
+          CurrentEncoderState[0] = 1;
+        else
+          CurrentEncoderState[0] = 0;
+      }
+      LcdFlag = 1;
+    }
+
+    if (enc1.isHolded())
+    {
+      MenuCount = -1;
+      LcdFlag = 1;
+    }
+
+    if (enc1.isPress()) // push button
+    {
+
+      if (MenuCount == 3 || MenuCount == 4 || MenuCount == 16)
+      {
+        activeEncoder = CurrentEncoderState[0];
+      }
+      else if (MenuCount == 1)
+        activeEncoder = 0;
+
+      CurrentEncoderState[1] = CurrentEncoderState[0];
+      if (MenuCount == -1) // go out from first page
+      {
+        MenuCount = CurrentEncoderState[1];
+      }
+      else if (MenuCount == 2 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go out from first page
+      {
+        MenuCount = -1;
+      }
+      else if (MenuCount == 2 && CurrentEncoderState[0] == 1) // go to the Devices page
+      {
+        MenuCount = 21;
+      }
+      else if (MenuCount == 21) // go to the Devices page
+      {
+        MenuCount++;
+        adjyear = CurrentEncoderState[1] + 2021;
+      }
+      else if (MenuCount == 22) // go to the Devices page
+      {
+        MenuCount++;
+        adjmont = CurrentEncoderState[1];
+      }
+      else if (MenuCount == 23) // go to the Devices page
+      {
+        MenuCount++;
+        adjday = CurrentEncoderState[1];
+      }
+      else if (MenuCount == 24) // go to the Devices page
+      {
+        MenuCount++;
+        adjhour = CurrentEncoderState[1];
+      }
+      else if (MenuCount == 25) // go to the Devices page
+      {
+        MenuCount = 2;
+        adjmin = CurrentEncoderState[1];
+        rtc.adjust(DateTime(adjyear, adjmont, adjday, adjhour, adjmin, 0));
+        DateTime now = rtc.now();
+        CurrentDay = now.day();
+        ZeroSensor = now.second();
+        PreviousSensorState[0] = now.hour();
+        PreviousSensorState[1] = now.minute();
+        CurrentYear = now.year();
+        CurrentMonth = now.month();
+        SetupMenu[1] = String(now.year()) + "." + String(CurrentDay) + "." + String(now.month()) + "  " + String(PreviousSensorState[0]) + ":" + String(PreviousSensorState[1]);
+      }
+      else if (MenuCount == 21) // go to the Devices page
+      {
+        MenuCount++;
+        adjyear = CurrentEncoderState[1];
+      }
+      else if (MenuCount == 0 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the first page
+      {
+        MenuCount = -1;
+      }
+      else if (MenuCount == 1 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the first page
+      {
+        MenuCount = -1;
+      }
+      else if (MenuCount == 1 && CurrentEncoderState[0] != MenuItems[MenuCount + 1] && CurrentEncoderState[1] != 2) // go to the WaterPattern page
+      {
+        MenuCount = CurrentEncoderState[1] + 3;
+      }
+      else if (MenuCount == 1 && CurrentEncoderState[0] == 2) // go to the Devices page
+      {
+        MenuCount = 16;
+      }
+      else if (MenuCount == 16 && CurrentEncoderState[0] != MenuItems[MenuCount + 1]) // go to the Devices page
+      {
+        MenuCount = 17;
+      }
+      else if (MenuCount == 17) // go to the Devices page
+      {
+        MenuCount = 18;
+        (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 0] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 0] = CurrentEncoderState[0];
+      }
+      else if (MenuCount == 18) // go to the Devices page
+      {
+        MenuCount = 19;
+        (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 1] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 1] = CurrentEncoderState[0];
+      }
+      else if (MenuCount == 19) // go to the Devices page
+      {
+
+        (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 2] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 2] = CurrentEncoderState[0];
+        MenuCount = 20;
+      }
+      else if (MenuCount == 20) // go to the Devices page
+      {
+        (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 3] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 3] = CurrentEncoderState[0];
+        MenuCount = 16;
+      }
+      else if (MenuCount == 16 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the Devices page
+      {
+        MenuCount = 1;
+      }
+      else if (MenuCount == 2 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go out from first page
+      {
+        MenuCount = -1;
+      }
+      else if (MenuCount == 3 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the Pattern page
+      {
+        MenuCount = 1;
+      }
+      else if (MenuCount == 3 && CurrentEncoderState[0] == 1) // change cycle
+      {
+        MenuCount = 5;
+      }
+      else if (MenuCount == 5) // back to water menu
+      {
+        CurrentSensorState[175] = CurrentEncoderState[1] % 24;
+        CurrentSensorState[174] = (CurrentEncoderState[1] - CurrentSensorState[175]) / 24;
         DateTime future(rtc.now() + TimeSpan(CurrentSensorState[174], CurrentSensorState[175], 0, 0));
         CurrentSensorState[166] = future.day();
         CurrentSensorState[167] = future.hour();
         CurrentSensorState[168] = future.minute();
-        TankFlag = 0;
+        MenuCount = 3;
+        flag = 1;
+        Serial.println("twelve");
       }
-      delay(100);
-      temper.requestTemperatures();                      // Send the command to get temperatures
-      CurrentSensorState[2] = temper.getTempCByIndex(0); // temperature
-      delay(100);
-    }
-  }
+      else if (MenuCount == 3 && CurrentEncoderState[0] == 2) // change cycle
+      {
+        MenuCount = 6;
+      }
+      else if (MenuCount == 6) // go to the WaterPattern page
+      {
+        CurrentSensorState[178] = CurrentEncoderState[1];
+        MenuCount = 3;
+      }
+      else if (MenuCount == 3 && CurrentEncoderState[0] == 3) // change cycle
+      {
+        MenuCount = 7;
+      }
+      else if (MenuCount == 7) // go to the WaterPattern page
+      {
+        CurrentSensorState[176] = CurrentEncoderState[1];
+        MenuCount = 3;
+      }
 
-  enc1.tick();
-  if (enc1.isRight())
-  {
-    CurrentEncoderState[0]--;
-    if (MenuCount == 0 && CurrentEncoderState[0] < 1)
-    {
-      CurrentEncoderState[0] = MenuItems[MenuCount + 1];
-    }
-    else if (CurrentEncoderState[0] < 0 && MenuCount != 0)
-    {
-      CurrentEncoderState[0] = MenuItems[MenuCount + 1];
-    }
-    LcdFlag = 1;
-  }
+      else if (MenuCount == 3 && CurrentEncoderState[0] == 4) // change cycle
+      {
+        MenuCount = 8;
+      }
+      else if (MenuCount == 8) // go to the WaterPattern page
+      {
+        CurrentSensorState[170] = CurrentEncoderState[1];
+        MenuCount = 3;
+      }
 
-  if (enc1.isLeft())
-  {
-    CurrentEncoderState[0]++;
-    if (CurrentEncoderState[0] > MenuItems[MenuCount + 1])
-    {
-      if (MenuCount == 0)
+      else if (MenuCount == 3 && CurrentEncoderState[0] == 5) // change cycle
+      {
+        MenuCount = 9;
+      }
+      else if (MenuCount == 9) // go to the WaterPattern page
+      {
+        CurrentSensorState[177] = CurrentEncoderState[1];
+        MenuCount = 3;
+      }
+
+      else if (MenuCount == 3 && CurrentEncoderState[0] == 6) // change cycle
+      {
+        MenuCount = 10;
+      }
+      else if (MenuCount == 10) // go to the WaterPattern page
+      {
+        CurrentSensorState[169] = CurrentEncoderState[1];
+        MenuCount = 3;
+      }
+
+      else if (MenuCount == 4 && CurrentEncoderState[0] == 3) // change cycle
+      {
+        MenuCount = 1;
+      }
+      else if (MenuCount == 4 && CurrentEncoderState[0] == 0) // go to the WaterPattern page
+      {
+        MenuCount = 11;
+      }
+      else if (MenuCount == 11) // go to the WaterPattern page
+      {
+        CurrentSensorState[leng - 4] = CurrentEncoderState[1];
+        MenuCount = 4;
+      }
+
+      else if (MenuCount == 4 && CurrentEncoderState[0] == 1) // go to the WaterPattern page
+      {
+        MenuCount = 12;
+      }
+      else if (MenuCount == 12) // go to the WaterPattern page
+      {
+        CurrentSensorState[161] = CurrentEncoderState[1];
+        MenuCount = 13;
+      }
+      else if (MenuCount == 13) // go to the WaterPattern page
+      {
+        CurrentSensorState[162] = CurrentEncoderState[1];
+        MenuCount = 4;
+      }
+
+      else if (MenuCount == 4 && CurrentEncoderState[0] == 2) // go to the WaterPattern page
+      {
+        MenuCount = 14;
+      }
+      else if (MenuCount == 14) // go to the WaterPattern page
+      {
+        CurrentSensorState[163] = CurrentEncoderState[1];
+        MenuCount = 15;
+      }
+      else if (MenuCount == 15) // go to the WaterPattern page
+      {
+        CurrentSensorState[164] = CurrentEncoderState[1];
+        MenuCount = 4;
+      }
+      // here i change variables
+      if (CurrentEncoderState[0] > MenuItems[MenuCount])
         CurrentEncoderState[0] = 1;
       else
         CurrentEncoderState[0] = 0;
+      if (MenuCount == 0)
+        CurrentEncoderState[0] = 1;
+      else if (MenuCount == -1)
+        CurrentEncoderState[0] = 0;
+
+      if (MenuCount == 3 || MenuCount == 4 || MenuCount == 16)
+      {
+        CurrentEncoderState[0] = activeEncoder;
+      }
+      LcdFlag = 1;
     }
-    LcdFlag = 1;
   }
-  if (enc1.isHolded())
-  {
-    MenuCount = -1;
-    LcdFlag = 1;
-  }
-
-  if (enc1.isPress()) // push button
-  {
-
-    if (MenuCount == 3 || MenuCount == 4 || MenuCount == 16)
-    {
-      activeEncoder = CurrentEncoderState[0];
-    }
-    else if (MenuCount == 1)
-      activeEncoder = 0;
-
-    CurrentEncoderState[1] = CurrentEncoderState[0];
-    if (MenuCount == -1) // go out from first page
-    {
-      MenuCount = CurrentEncoderState[1];
-    }
-    else if (MenuCount == 2 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go out from first page
-    {
-      MenuCount = -1;
-    }
-    else if (MenuCount == 2 && CurrentEncoderState[0] == 1) // go to the Devices page
-    {
-      MenuCount = 21;
-    }
-    else if (MenuCount == 21) // go to the Devices page
-    {
-      MenuCount++;
-      adjyear = CurrentEncoderState[1] + 2021;
-    }
-    else if (MenuCount == 22) // go to the Devices page
-    {
-      MenuCount++;
-      adjmont = CurrentEncoderState[1];
-    }
-    else if (MenuCount == 23) // go to the Devices page
-    {
-      MenuCount++;
-      adjday = CurrentEncoderState[1];
-    }
-    else if (MenuCount == 24) // go to the Devices page
-    {
-      MenuCount++;
-      adjhour = CurrentEncoderState[1];
-    }
-    else if (MenuCount == 25) // go to the Devices page
-    {
-      MenuCount = 2;
-      adjmin = CurrentEncoderState[1];
-      rtc.adjust(DateTime(adjyear, adjmont, adjday, adjhour, adjmin, 0));
-      DateTime now = rtc.now();
-      CurrentDay = now.day();
-      ZeroSensor = now.second();
-      PreviousSensorState[0] = now.hour();
-      PreviousSensorState[1] = now.minute();
-      CurrentYear = now.year();
-      CurrentMonth = now.month();
-      SetupMenu[1] = String(now.year()) + "." + String(CurrentDay) + "." + String(now.month()) + "  " + String(PreviousSensorState[0]) + ":" + String(PreviousSensorState[1]);
-    }
-    else if (MenuCount == 21) // go to the Devices page
-    {
-      MenuCount++;
-      adjyear = CurrentEncoderState[1];
-    }
-    else if (MenuCount == 0 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the first page
-    {
-      MenuCount = -1;
-    }
-    else if (MenuCount == 1 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the first page
-    {
-      MenuCount = -1;
-    }
-    else if (MenuCount == 1 && CurrentEncoderState[0] != MenuItems[MenuCount + 1] && CurrentEncoderState[1] != 2) // go to the WaterPattern page
-    {
-      MenuCount = CurrentEncoderState[1] + 3;
-    }
-    else if (MenuCount == 1 && CurrentEncoderState[0] == 2) // go to the Devices page
-    {
-      MenuCount = 16;
-    }
-    else if (MenuCount == 16 && CurrentEncoderState[0] != MenuItems[MenuCount + 1]) // go to the Devices page
-    {
-      MenuCount = 17;
-    }
-    else if (MenuCount == 17) // go to the Devices page
-    {
-      MenuCount = 18;
-      (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 0] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 0] = CurrentEncoderState[0];
-    }
-    else if (MenuCount == 18) // go to the Devices page
-    {
-      MenuCount = 19;
-      (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 1] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 1] = CurrentEncoderState[0];
-    }
-    else if (MenuCount == 19) // go to the Devices page
-    {
-
-      (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 2] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 2] = CurrentEncoderState[0];
-      MenuCount = 20;
-    }
-    else if (MenuCount == 20) // go to the Devices page
-    {
-      (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 3] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 3] = CurrentEncoderState[0];
-      MenuCount = 16;
-    }
-    else if (MenuCount == 16 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the Devices page
-    {
-      MenuCount = 1;
-    }
-    else if (MenuCount == 2 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go out from first page
-    {
-      MenuCount = -1;
-    }
-    else if (MenuCount == 3 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the Pattern page
-    {
-      MenuCount = 1;
-    }
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 1) // change cycle
-    {
-      MenuCount = 5;
-    }
-    else if (MenuCount == 5) // back to water menu
-    {
-      CurrentSensorState[175] = CurrentEncoderState[1] % 24;
-      CurrentSensorState[174] = (CurrentEncoderState[1] - CurrentSensorState[175]) / 24;
-      DateTime future(rtc.now() + TimeSpan(CurrentSensorState[174], CurrentSensorState[175], 0, 0));
-      CurrentSensorState[166] = future.day();
-      CurrentSensorState[167] = future.hour();
-      CurrentSensorState[168] = future.minute();
-      MenuCount = 3;
-      flag = 1;
-      Serial.println("twelve");
-    }
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 2) // change cycle
-    {
-      MenuCount = 6;
-    }
-    else if (MenuCount == 6) // go to the WaterPattern page
-    {
-      CurrentSensorState[178] = CurrentEncoderState[1];
-      MenuCount = 3;
-    }
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 3) // change cycle
-    {
-      MenuCount = 7;
-    }
-    else if (MenuCount == 7) // go to the WaterPattern page
-    {
-      CurrentSensorState[176] = CurrentEncoderState[1];
-      MenuCount = 3;
-    }
-
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 4) // change cycle
-    {
-      MenuCount = 8;
-    }
-    else if (MenuCount == 8) // go to the WaterPattern page
-    {
-      CurrentSensorState[170] = CurrentEncoderState[1];
-      MenuCount = 3;
-    }
-
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 5) // change cycle
-    {
-      MenuCount = 9;
-    }
-    else if (MenuCount == 9) // go to the WaterPattern page
-    {
-      CurrentSensorState[177] = CurrentEncoderState[1];
-      MenuCount = 3;
-    }
-
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 6) // change cycle
-    {
-      MenuCount = 10;
-    }
-    else if (MenuCount == 10) // go to the WaterPattern page
-    {
-      CurrentSensorState[169] = CurrentEncoderState[1];
-      MenuCount = 3;
-    }
-
-    else if (MenuCount == 4 && CurrentEncoderState[0] == 3) // change cycle
-    {
-      MenuCount = 1;
-    }
-    else if (MenuCount == 4 && CurrentEncoderState[0] == 0) // go to the WaterPattern page
-    {
-      MenuCount = 11;
-    }
-    else if (MenuCount == 11) // go to the WaterPattern page
-    {
-      CurrentSensorState[leng - 4] = CurrentEncoderState[1];
-      MenuCount = 4;
-    }
-
-    else if (MenuCount == 4 && CurrentEncoderState[0] == 1) // go to the WaterPattern page
-    {
-      MenuCount = 12;
-    }
-    else if (MenuCount == 12) // go to the WaterPattern page
-    {
-      CurrentSensorState[161] = CurrentEncoderState[1];
-      MenuCount = 13;
-    }
-    else if (MenuCount == 13) // go to the WaterPattern page
-    {
-      CurrentSensorState[162] = CurrentEncoderState[1];
-      MenuCount = 4;
-    }
-
-    else if (MenuCount == 4 && CurrentEncoderState[0] == 2) // go to the WaterPattern page
-    {
-      MenuCount = 14;
-    }
-    else if (MenuCount == 14) // go to the WaterPattern page
-    {
-      CurrentSensorState[163] = CurrentEncoderState[1];
-      MenuCount = 15;
-    }
-    else if (MenuCount == 15) // go to the WaterPattern page
-    {
-      CurrentSensorState[164] = CurrentEncoderState[1];
-      MenuCount = 4;
-    }
-    // here i change variables
-    if (CurrentEncoderState[0] > MenuItems[MenuCount])
-      CurrentEncoderState[0] = 1;
-    else
-      CurrentEncoderState[0] = 0;
-    if (MenuCount == 0)
-      CurrentEncoderState[0] = 1;
-    else if (MenuCount == -1)
-      CurrentEncoderState[0] = 0;
-
-    if (MenuCount == 3 || MenuCount == 4 || MenuCount == 16)
-    {
-      CurrentEncoderState[0] = activeEncoder;
-    }
-    LcdFlag = 1;
-  }
-
-  if (flag == 1)
+  if (flag && value == 254 && FirstTimeFlag > 1)
   {
     Serial.println("Something has changed  ");
     key = 0;
-    for (int i = 0; i < leng; i++)
+    for (int i = 0; i < leng - 1; i++)
     {
       if (CurrentSensorState[i] != PreviousSensorState[i])
       {
+        Serial.print(i);
+        Serial.print("_");
+        Serial.print(CurrentSensorState[i]);
+        Serial.print("_");
+        Serial.print(PreviousSensorState[i]);
+        Serial.print("  ");
         PreviousSensorState[i] = CurrentSensorState[i];
         index[key] = i;
         key++;
         LcdFlag = 1;
       }
-      Serial.print(CurrentSensorState[i]);
-      Serial.print("_");
     }
+    if (FirstTimeFlag == 1)
+      Serial.println();
+    Serial.print("key  ");
+    Serial.println(key);
     key = key * 2 + 1;
-    Serial.println();
     flag = 0;
   }
   if (LcdFlag && (millis() - TimeFromBegin) > 150)
@@ -1473,4 +1505,6 @@ void loop()
     LcdFlag = 0;
     TimeFromBegin = millis();
   }
+  if (key > 1 && value == 254)
+    digitalWrite(PinForMaster, HIGH);
 }
