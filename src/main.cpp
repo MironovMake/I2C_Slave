@@ -52,7 +52,7 @@ String DeviceMenu[] = {"SOLI", "LASER1", "LASER2",
                        "VALVE1", "VALVE2", "VALVE3", "VALVE4", "VALVE5", "VALVE6",
                        "PUMP1", "PUMP2", "PUMP3", "PUMP4", "BIG_PUMP",
                        "DEVICE1", "DEVICE2", "DEVICE3", "DEVICE4", "DEVICE5", "DEVICE6", "DEVICE7", "DEVICE8",
-                       "DRIVE1", "DRIVE2", "DRIVE3", "DRIVE4", "STEP1", "STEP2", "STEP3", "STEP4", "Back"};
+                       "LED", "DRIVE1", "DRIVE2", "DRIVE3", "DRIVE4", "STEP1", "STEP2", "STEP3", "STEP4", "Back"};
 
 int ActiveDev;
 int UnderMenu;
@@ -60,15 +60,15 @@ int DificultDevice[] = {15, 16, 17, 18, 19, 20, 21, 56};
 // Stepper adjust
 #include <AccelStepper.h>
 #define motorInterfaceType 1
-
-AccelStepper stepper1 = AccelStepper(motorInterfaceType, 2, 3); // stepPin, dirPin
-// Led motor
-AccelStepper stepper2 = AccelStepper(motorInterfaceType, 4, 8);
 // Tank motor
+AccelStepper stepper1_Tank = AccelStepper(motorInterfaceType, 2, 3); // stepPin, dirPin for tank
+// Led motor
+AccelStepper stepper2_Led = AccelStepper(motorInterfaceType, 4, 8);
+
 AccelStepper stepper3 = AccelStepper(motorInterfaceType, 11, 10);
 AccelStepper stepper4 = AccelStepper(motorInterfaceType, 12, 13);
-int enable1 = 58; //58
-int enable2 = 59;
+int enable1_Tank = 58; //58
+int enable2_Led = 59;
 int enable3 = 60;
 int enable4 = 61;
 
@@ -98,8 +98,9 @@ int counter = 0;
 // hour, min, temper
 int NumberSpecialSensors = 3;
 // all variables
-const int leng = 183;
+const int leng = 188;
 // pins of inputs sensors is 12
+// int InputNumber = 12
 int InputNumber = 12;
 int ZeroSensor;
 bool translateflag = 1;
@@ -118,40 +119,42 @@ bool translateflag = 1;
   pin 55  InputSensors[11]  "OBTACLE2",
 */
 int InputSensors[] = {22, 56, 27, 28, 35, 36, 37, 38, 52, 53, 54, 55};
-
-const int OutputNumber = 30;
+bool OutputFlag[31];
+const int OutputNumber = 31;
 // pins of OUTPUTS
 /* here outputs states:
 
-  pin  24    OutputSensors[0]  "SOLI",     drain water from tank
-  pin  25    OutputSensors[1]  "LASER1",   for LED mode
-  pin  26    OutputSensors[2]  "LASER2", 
-  pin  29    OutputSensors[3]  "VALVE1",   valve before tank
-  pin  30    OutputSensors[4]  "VALVE2",   valve for irrigation
-  pin  31    OutputSensors[5]  "VALVE3",   valve for waterring
-  pin  32    OutputSensors[6]  "VALVE4",
-  pin  33    OutputSensors[7]  "VALVE5", 
-  pin  34    OutputSensors[8]  "VALVE6", 
-  pin  39    OutputSensors[9]  "PUMP1",    pump before tank
-  pin  40    OutputSensors[10]  "PUMP2",   mixer
-  pin  41    OutputSensors[11]  "PUMP3",   pump for wattering and irrigation
-  pin  42    OutputSensors[12]  "PUMP4", 
-  pin  43    OutputSensors[13]  "BIG_PUMP"
-  pin  44    OutputSensors[14]  "DEVICE1", 
-  pin  45    OutputSensors[15]  "DEVICE2", 
-  pin  46    OutputSensors[16]  "DEVICE3", 
-  pin  47    OutputSensors[17]  "DEVICE4", 
-  pin  48    OutputSensors[18]  "DEVICE5", 
-  pin  49    OutputSensors[19]  "DEVICE6", 
-  pin  50    OutputSensors[20]  "DEVICE7", 
-  pin  51    OutputSensors[21]  "DEVICE8",
-  pin  15,16    OutputSensors[22,23]  "DRIVE1", 
-  pin  17,18    OutputSensors[24,25]  "DRIVE2", 
-  pin  19,20    OutputSensors[26,27]  "DRIVE3", 
-  pin  21,56    OutputSensors[28,29]  "DRIVE4",
+  pin  24    OutputSensors[0]      "SOLI",     drain water from tank
+  pin  25    OutputSensors[1]      "LASER1",   for LED mode
+  pin  26    OutputSensors[2]      "LASER2", 
+  pin  29    OutputSensors[3]      "VALVE1",   valve before tank
+  pin  30    OutputSensors[4]      "VALVE2",   valve for irrigation
+  pin  31    OutputSensors[5]      "VALVE3",   valve for waterring
+  pin  32    OutputSensors[6]      "VALVE4",
+  pin  33    OutputSensors[7]      "VALVE5", 
+  pin  34    OutputSensors[8]      "VALVE6", 
+  pin  39    OutputSensors[9]      "PUMP1",    pump before tank
+  pin  40    OutputSensors[10]     "PUMP2",   mixer
+  pin  41    OutputSensors[11]     "PUMP3",   pump for wattering and irrigation
+  pin  42    OutputSensors[12]     "PUMP4", 
+  pin  43    OutputSensors[13]     "BIG_PUMP"
+  pin  44    OutputSensors[14]     "DEVICE1", 
+  pin  45    OutputSensors[15]     "DEVICE2", 
+  pin  46    OutputSensors[16]     "DEVICE3", 
+  pin  47    OutputSensors[17]     "DEVICE4", 
+  pin  48    OutputSensors[18]     "DEVICE5", 
+  pin  49    OutputSensors[19]     "DEVICE6", 
+  pin  50    OutputSensors[20]     "DEVICE7", 
+  pin  51    OutputSensors[21]     "DEVICE8",
+  pin  57    OutputSensors[22]     "LED",
+  pin  15,16 OutputSensors[23,24]  "DRIVE1", 
+  pin  17,18 OutputSensors[25,26]  "DRIVE2", 
+  pin  19,20 OutputSensors[27,28]  "DRIVE3", 
+  pin  21,56 OutputSensors[29,30]  "DRIVE4",
+  
 */
 int OutputSensors[] = {24, 25, 26, 29, 30, 31, 32, 33, 34, 39, 40, 41, 42, 43, 44, 45, 46,
-                       47, 48, 49, 50, 51, 15, 16, 17, 18, 19, 20, 21, 56};
+                       47, 48, 49, 50, 51, 57, 15, 16, 17, 18, 19, 20, 21, 56};
 unsigned long frucuenTrans;
 int PreviousSensorState[leng];
 int CurrentSensorState[leng];
@@ -169,8 +172,7 @@ int n, m;
 int value;
 // wait till esp send first datesadDS
 int FirstTimeFlag = 0;
-// pin 57
-int LED = 57;
+
 int CurrentDay;
 int EventHour;
 int EventMin;
@@ -195,25 +197,25 @@ String WaterMenuValue(int j)
   switch (j)
   {
   case 0:
-    ValueOfOneString = String(CurrentSensorState[166]) + "." + String(CurrentSensorState[165]) + "/" + String(CurrentSensorState[167]) + ":" + String(CurrentSensorState[168]);
+    ValueOfOneString = String(CurrentSensorState[171]) + "." + String(CurrentSensorState[170]) + "/" + String(CurrentSensorState[172]) + ":" + String(CurrentSensorState[173]);
     break;
   case 1:
-    ValueOfOneString = String(CurrentSensorState[174] * 24 + CurrentSensorState[175]); //cycle
+    ValueOfOneString = String(CurrentSensorState[179] * 24 + CurrentSensorState[180]); //cycle
     break;
   case 2:
-    ValueOfOneString = String(CurrentSensorState[178]);
+    ValueOfOneString = String(CurrentSensorState[183]);
     break;
   case 3:
-    ValueOfOneString = String(CurrentSensorState[176]);
+    ValueOfOneString = String(CurrentSensorState[181]);
     break;
   case 4:
-    ValueOfOneString = String(CurrentSensorState[170]);
+    ValueOfOneString = String(CurrentSensorState[175]);
     break;
   case 5:
-    ValueOfOneString = String(CurrentSensorState[177]);
+    ValueOfOneString = String(CurrentSensorState[182]);
     break;
   case 6:
-    ValueOfOneString = String(CurrentSensorState[169]);
+    ValueOfOneString = String(CurrentSensorState[174]);
     break;
   case 7:
     ValueOfOneString = "";
@@ -230,10 +232,10 @@ String LedMenuValue(int j)
     ValueOfLedString = String(CurrentSensorState[leng - 4]);
     break;
   case 1:
-    ValueOfLedString = String(CurrentSensorState[161]) + ":" + String(CurrentSensorState[162]); //cycle
+    ValueOfLedString = String(CurrentSensorState[166]) + ":" + String(CurrentSensorState[167]); //cycle
     break;
   case 2:
-    ValueOfLedString = String(CurrentSensorState[163]) + ":" + String(CurrentSensorState[164]);
+    ValueOfLedString = String(CurrentSensorState[168]) + ":" + String(CurrentSensorState[169]);
     break;
   case 3:
     ValueOfLedString = "";
@@ -246,7 +248,7 @@ int OneSensorsRequest(int temporary)
   int statistic[10];
   for (int j = 0; j < 10; j++)
   {
-    (temporary == 0 || temporary == 6 || temporary == 7 || temporary == 8 || temporary == 9) ? statistic[j] = !digitalRead(InputSensors[temporary]) : statistic[j] = digitalRead(InputSensors[temporary]);
+    (temporary == 0 || temporary > 6) ? statistic[j] = !digitalRead(InputSensors[temporary]) : statistic[j] = digitalRead(InputSensors[temporary]);
   }
   for (int k = 0; k < 10; k++) // sort
   {
@@ -271,18 +273,18 @@ int OneSensorsRequest(int temporary)
 void SensorsInit()
 {
   // pins for control step motors
-  pinMode(enable1, OUTPUT);
-  pinMode(enable2, OUTPUT);
+  pinMode(enable1_Tank, OUTPUT);
+  pinMode(enable2_Led, OUTPUT);
   // Switch off power of step motors
-  digitalWrite(enable1, HIGH);
-  digitalWrite(enable2, HIGH);
+  digitalWrite(enable1_Tank, HIGH);
+  digitalWrite(enable2_Led, HIGH);
 
   pinMode(PinForMaster, OUTPUT);
   digitalWrite(PinForMaster, LOW);
   for (int i = 0; i < InputNumber; i++)
   {
     pinMode(InputSensors[i], INPUT);
-    (i == 6 || i == 7 || i == 8 || i == 9) ? pinMode(InputSensors[i], INPUT_PULLUP) : pinMode(InputSensors[i], INPUT);
+    (i > 6) ? pinMode(InputSensors[i], INPUT_PULLUP) : pinMode(InputSensors[i], INPUT);
     OneSensorsRequest(i);
   }
   for (int i = 0; i < OutputNumber; i++)
@@ -290,7 +292,7 @@ void SensorsInit()
     pinMode(OutputSensors[i], OUTPUT);
     CurrentSensorState[1 + NumberSpecialSensors + InputNumber + i] = 0;
   }
-  pinMode(LED, OUTPUT);
+  pinMode(OutputSensors[22], OUTPUT);
 }
 
 void EventTimeUpdate(int some)
@@ -305,23 +307,26 @@ void EventTimeUpdate(int some)
 void SensorsRequest()
 {
   // sensors setup
-  for (int i = 53; i < 154; i = i + 4)
+  for (int i = 54; i < 159; i = i + 4)
   {
-
     if (CurrentSensorState[i] != CurrentSensorState[i + 2] || CurrentSensorState[i + 1] != CurrentSensorState[i + 3])
     {
-      if (CurrentSensorState[i] == CurrentSensorState[0] && CurrentSensorState[i + 1] == CurrentSensorState[1])
+      if (CurrentSensorState[i] == CurrentSensorState[0] && CurrentSensorState[i + 1] == CurrentSensorState[1] && OutputFlag[(i - 54) / 4] == 0)
       {
-        CurrentSensorState[19 + (i - 53) / 4] = 1;
-        digitalWrite(OutputSensors[(i - 53) / 4], HIGH);
+        CurrentSensorState[19 + (i - 54) / 4] = 1;
+        digitalWrite(OutputSensors[(i - 54) / 4], HIGH);
+        OutputFlag[(i - 54) / 4] = 1;
+        Serial.println("i - 54) / 4  ");
+        Serial.println((i - 54) / 4);
         flag = 1;
         Serial.println("two");
       }
-      else if (CurrentSensorState[i + 2] == CurrentSensorState[0] && CurrentSensorState[i + 3] == CurrentSensorState[1])
+      else if (CurrentSensorState[i + 2] == CurrentSensorState[0] && CurrentSensorState[i + 3] == CurrentSensorState[1] && OutputFlag[(i - 54) / 4] == 1)
       {
-        CurrentSensorState[19 + (i - 53) / 4] = 0;
-        digitalWrite(OutputSensors[(i - 53) / 4], LOW);
+        CurrentSensorState[19 + (i - 54) / 4] = 0;
+        digitalWrite(OutputSensors[(i - 54) / 4], LOW);
         flag = 1;
+        OutputFlag[(i - 54) / 4] = 0;
         Serial.println("tree");
       }
     }
@@ -333,153 +338,144 @@ void SensorsRequest()
     {
       flag = 1;
       Serial.println("four  ");
+      Serial.println(i);
     }
   }
   // tank adjust
-  if (CurrentSensorState[177] > 0)
+  if (CurrentSensorState[182] > 0)
   {
-    if (digitalRead(InputSensors[2]) && TankFlag == 0 && CurrentSensorState[170] > 0) // drain water
+    if (digitalRead(InputSensors[2]) && TankFlag == 0 && CurrentSensorState[175] > 0) // drain water
     {
       digitalWrite(OutputSensors[0], HIGH); // soli on
       TankFlag++;
       Serial.println("drain water");
     }
-    if (!digitalRead(InputSensors[2]) && TankFlag < 2 && CurrentSensorState[170] > 0)
+    if (!digitalRead(InputSensors[2]) && TankFlag < 2 && CurrentSensorState[175] > 0)
     {
       digitalWrite(OutputSensors[0], LOW); // soli off
       TankFlag = 2;
-      delay(500);
     }
     // fill tank
-    if (!digitalRead(InputSensors[3]) && TankFlag == 2 && CurrentSensorState[170] > 0) // if max bobber show low level
+    if (!digitalRead(InputSensors[3]) && TankFlag == 2 && CurrentSensorState[175] > 0) // if max bobber show low level
     {
       digitalWrite(OutputSensors[3], HIGH); // open valve before tank
-      delay(500);
       digitalWrite(OutputSensors[9], HIGH); // pump1 on
       Serial.println("fill tank");
       TankFlag++; // 3
     }
-    if (digitalRead(InputSensors[3]) && TankFlag == 3 && CurrentSensorState[170] > 0) // when tank is fill
+    if (digitalRead(InputSensors[3]) && TankFlag == 3 && CurrentSensorState[175] > 0) // when tank is fill
     {
       digitalWrite(OutputSensors[9], LOW); // off pump
       digitalWrite(OutputSensors[3], LOW); // close valve
       TankFlag++;                          //4
     }
     // turn reel
-    if (TankFlag == 4 && CurrentSensorState[170] > 0)
+    if (TankFlag == 4 && CurrentSensorState[175] > 0)
     {
 
       Serial.println("turn stepper");
 
-      digitalWrite(enable1, LOW);
+      digitalWrite(enable1_Tank, LOW);
       delay(500);
-      stepper1.setCurrentPosition(0);
-      while (stepper1.currentPosition() != round(CurrentSensorState[leng - 5] / 1.8))
+      stepper1_Tank.setCurrentPosition(0);
+      while (stepper1_Tank.currentPosition() != round(CurrentSensorState[leng - 5] / 1.8))
       {
-        stepper1.setSpeed(500);
-        stepper1.runSpeed();
+        stepper1_Tank.setSpeed(500);
+        stepper1_Tank.runSpeed();
       }
       delay(300);
       Serial.println("Start mix");
-      digitalWrite(enable1, HIGH);
+      digitalWrite(enable1_Tank, HIGH);
       delay(300);
       digitalWrite(OutputSensors[10], HIGH); // start mixing
-      EventTimeUpdate(CurrentSensorState[176]);
+      EventTimeUpdate(CurrentSensorState[181]);
       TankFlag++; // 5
     }
-    if (CurrentSensorState[1] == EventMin && CurrentSensorState[0] == EventHour && CurrentDay == EventDay && TankFlag == 5 && CurrentSensorState[170] > 0)
+    if (CurrentSensorState[1] == EventMin && CurrentSensorState[0] == EventHour && CurrentDay == EventDay && TankFlag == 5 && CurrentSensorState[175] > 0)
     {
       digitalWrite(OutputSensors[10], LOW); // stop mixing
-      EventTimeUpdate(CurrentSensorState[170]);
+      EventTimeUpdate(CurrentSensorState[175]);
       delay(300);
       digitalWrite(OutputSensors[4], HIGH); // open valve for irrigation
       delay(300);
       digitalWrite(OutputSensors[11], HIGH); // water all
       TankFlag++;
-      delay(300);
       // 7
     }
-    if (CurrentSensorState[1] == EventMin && CurrentSensorState[0] == EventHour && CurrentDay == EventDay && TankFlag == 6 && CurrentSensorState[170] > 0)
+    if (CurrentSensorState[1] == EventMin && CurrentSensorState[0] == EventHour && CurrentDay == EventDay && TankFlag == 6 && CurrentSensorState[175] > 0)
     {
       Serial.println("irrigation");
       digitalWrite(OutputSensors[11], LOW); // stop water
       digitalWrite(OutputSensors[4], LOW);  // close valve
       TankFlag++;
-      delay(300);
 
       // 7
     }
-    if (digitalRead(InputSensors[2]) && TankFlag == 7 && CurrentSensorState[170] > 0) // drain water
+    if (digitalRead(InputSensors[2]) && TankFlag == 7 && CurrentSensorState[175] > 0) // drain water
     {
-      delay(300);
       digitalWrite(OutputSensors[0], HIGH); // soli on
       TankFlag++;
 
       Serial.println("draun tank after irrigation");
     }
-    if (!digitalRead(InputSensors[2]) && (TankFlag == 7 || TankFlag == 8) && CurrentSensorState[170] > 0)
+    if (!digitalRead(InputSensors[2]) && (TankFlag == 7 || TankFlag == 8) && CurrentSensorState[175] > 0)
     {
       digitalWrite(OutputSensors[0], LOW); // soli off
       TankFlag = 9;
-      delay(300);
     }
   }
-  if (CurrentSensorState[170] == 0 && TankFlag == 0)
+  if (CurrentSensorState[175] == 0 && TankFlag == 0)
     TankFlag = 9;
 
   // I finised irrigation
-  if (digitalRead(InputSensors[2]) && TankFlag == 9 && CurrentSensorState[169] > 0) // drain water
+  if (digitalRead(InputSensors[2]) && TankFlag == 9 && CurrentSensorState[174] > 0) // drain water
   {
-    delay(300);
     digitalWrite(OutputSensors[0], HIGH); // soli on
     Serial.println("drain tank before watering");
     TankFlag++;
   }
-  if (!digitalRead(InputSensors[2]) && (TankFlag == 9 || TankFlag == 10) && CurrentSensorState[169] > 0)
+  if (!digitalRead(InputSensors[2]) && (TankFlag == 9 || TankFlag == 10) && CurrentSensorState[174] > 0)
   {
     digitalWrite(OutputSensors[0], LOW); // soli off
     TankFlag = 11;
-    delay(100);
   }
   // fill tank
-  if (!digitalRead(InputSensors[3]) && TankFlag == 11 && CurrentSensorState[169] > 0)
+  if (!digitalRead(InputSensors[3]) && TankFlag == 11 && CurrentSensorState[174] > 0)
   {
     Serial.println("fill tank for watering");
-    delay(300);
     digitalWrite(OutputSensors[3], HIGH); // open valve before tank
-    delay(300);
     digitalWrite(OutputSensors[9], HIGH); // pump1 on
     TankFlag++;                           // 3
   }
-  if (digitalRead(InputSensors[3]) && TankFlag == 12 && CurrentSensorState[169] > 0) // when tank is fill
+  if (digitalRead(InputSensors[3]) && TankFlag == 12 && CurrentSensorState[174] > 0) // when tank is fill
   {
     digitalWrite(OutputSensors[9], LOW); // off pump
     digitalWrite(OutputSensors[3], LOW); // close valve
     TankFlag++;                          //4
   }
 
-  if ((TankFlag == 13 && CurrentSensorState[169] > 0))
+  if ((TankFlag == 13 && CurrentSensorState[174] > 0))
   {
     Serial.println("turn stepper");
     delay(100);
-    digitalWrite(enable1, LOW);
-    stepper1.setCurrentPosition(0);
-    while (stepper1.currentPosition() != round(CurrentSensorState[leng - 5] / 1.8))
+    digitalWrite(enable1_Tank, LOW);
+    stepper1_Tank.setCurrentPosition(0);
+    while (stepper1_Tank.currentPosition() != round(CurrentSensorState[leng - 5] / 1.8))
     {
-      stepper1.setSpeed(600);
-      stepper1.runSpeed();
+      stepper1_Tank.setSpeed(600);
+      stepper1_Tank.runSpeed();
     }
     delay(500);
-    digitalWrite(enable1, HIGH);
+    digitalWrite(enable1_Tank, HIGH);
     delay(500);
     digitalWrite(OutputSensors[10], HIGH); // start mixing
 
     Serial.println("start mixing");
-    EventTimeUpdate(CurrentSensorState[177]);
+    EventTimeUpdate(CurrentSensorState[182]);
     delay(300);
     TankFlag++;
   }
-  if (CurrentSensorState[1] == EventMin && CurrentSensorState[0] == EventHour && CurrentDay == EventDay && TankFlag == 14 && CurrentSensorState[169] > 0)
+  if (CurrentSensorState[1] == EventMin && CurrentSensorState[0] == EventHour && CurrentDay == EventDay && TankFlag == 14 && CurrentSensorState[174] > 0)
   {
     delay(500);
     Serial.println("waterring");
@@ -487,12 +483,12 @@ void SensorsRequest()
     digitalWrite(OutputSensors[11], HIGH); // water all
     delay(500);
     digitalWrite(OutputSensors[5], HIGH); // open correct valve
-    EventTimeUpdate(CurrentSensorState[169]);
+    EventTimeUpdate(CurrentSensorState[174]);
     TankFlag++;
     delay(500);
     // 13
   }
-  if (CurrentSensorState[1] == EventMin && CurrentSensorState[0] == EventHour && CurrentDay == EventDay && TankFlag == 15 && CurrentSensorState[169] > 0)
+  if (CurrentSensorState[1] == EventMin && CurrentSensorState[0] == EventHour && CurrentDay == EventDay && TankFlag == 15 && CurrentSensorState[174] > 0)
   {
     delay(500);
     digitalWrite(OutputSensors[11], LOW); // stop water
@@ -501,7 +497,7 @@ void SensorsRequest()
     delay(500);
     // 14
   }
-  if (digitalRead(InputSensors[2]) && TankFlag == 16 && CurrentSensorState[169] > 0) // drain water
+  if (digitalRead(InputSensors[2]) && TankFlag == 16 && CurrentSensorState[174] > 0) // drain water
   {
     delay(500);
     digitalWrite(OutputSensors[0], HIGH); // soli on
@@ -509,7 +505,7 @@ void SensorsRequest()
     delay(500);
     Serial.println("drain after watering");
   }
-  if (!digitalRead(InputSensors[2]) && (TankFlag == 17 || TankFlag == 16) && CurrentSensorState[169] > 0)
+  if (!digitalRead(InputSensors[2]) && (TankFlag == 17 || TankFlag == 16) && CurrentSensorState[174] > 0)
   {
     digitalWrite(OutputSensors[0], LOW); // soli off
     TankFlag = 18;
@@ -517,36 +513,37 @@ void SensorsRequest()
   }
   // second step for LED adjust
   // if it's time for checking
-  if (CurrentSensorState[161] == CurrentSensorState[0] && CurrentSensorState[162] == CurrentSensorState[1] && (CurrentSensorState[161] != CurrentSensorState[163] || CurrentSensorState[162] != CurrentSensorState[164]) && !LedFlag)
+  if (CurrentSensorState[166] == CurrentSensorState[0] && CurrentSensorState[167] == CurrentSensorState[1] && (CurrentSensorState[166] != CurrentSensorState[168] || CurrentSensorState[167] != CurrentSensorState[169]) && !LedFlag)
   {
     digitalWrite(OutputSensors[1], HIGH);
     delay(500);
-    while (!digitalRead(InputSensors[10]) && !OneSensorsRequest(6)) // while the is obtacle and no switch
+    while (!CurrentSensorState[9] && !CurrentSensorState[13]) // while the is obtacle and no switch
     {
       // move step
-
-      digitalWrite(enable2, LOW);
+      digitalWrite(enable2_Led, LOW);
       delay(300);
-      stepper2.setCurrentPosition(0);
+      stepper2_Led.setCurrentPosition(0);
       CurrentSensorState[16] += CurrentSensorState[leng - 4];
-      while (stepper2.currentPosition() != round(CurrentSensorState[leng - 4] / 0.2 * 200))
+      while (stepper2_Led.currentPosition() != round(CurrentSensorState[leng - 4] / 0.2 * 200))
       {
-        stepper2.setSpeed(700);
-        stepper2.runSpeed();
+        stepper2_Led.setSpeed(700);
+        stepper2_Led.runSpeed();
       }
 
-      digitalWrite(enable2, HIGH);
+      digitalWrite(enable2_Led, HIGH);
       delay(1000);
+      CurrentSensorState[9] = OneSensorsRequest(6);
+      CurrentSensorState[13] = OneSensorsRequest(10);
     }
 
-    if (!digitalRead(InputSensors[6])) // if switc don't reach
-      digitalWrite(LED, HIGH);         //led on
+    if (!digitalRead(InputSensors[6]))       // if switc don't reach
+      digitalWrite(OutputSensors[22], HIGH); //led on
     LedFlag = 1;
     digitalWrite(OutputSensors[1], LOW); //laser off
   }
-  if (CurrentSensorState[163] == CurrentSensorState[0] && CurrentSensorState[164] == CurrentSensorState[1] && (CurrentSensorState[161] != CurrentSensorState[163] || CurrentSensorState[162] != CurrentSensorState[164]))
+  if (CurrentSensorState[168] == CurrentSensorState[0] && CurrentSensorState[169] == CurrentSensorState[1] && (CurrentSensorState[166] != CurrentSensorState[168] || CurrentSensorState[167] != CurrentSensorState[169]))
   {
-    digitalWrite(LED, LOW);
+    digitalWrite(OutputSensors[22], LOW);
     LedFlag = 0;
   }
 }
@@ -714,13 +711,13 @@ void LCD_request()
     lcd.setCursor(9, 1);
     lcd.print(CurrentEncoderState[0]);
     lcd.print(":");
-    lcd.print(CurrentSensorState[162]);
+    lcd.print(CurrentSensorState[167]);
     break;
   case 13: // main menu
     lcd.setCursor(9, 1);
     lcd.print("       ");
     lcd.setCursor(9, 1);
-    lcd.print(CurrentSensorState[161]);
+    lcd.print(CurrentSensorState[166]);
     lcd.print(":");
     lcd.print(CurrentEncoderState[0]);
     break;
@@ -730,13 +727,13 @@ void LCD_request()
     lcd.setCursor(10, 2);
     lcd.print(CurrentEncoderState[0]);
     lcd.print(":");
-    lcd.print(CurrentSensorState[164]);
+    lcd.print(CurrentSensorState[169]);
     break;
   case 15: // main menu
     lcd.setCursor(10, 2);
     lcd.print("       ");
     lcd.setCursor(10, 2);
-    lcd.print(CurrentSensorState[163]);
+    lcd.print(CurrentSensorState[168]);
     lcd.print(":");
     lcd.print(CurrentEncoderState[0]);
     break;
@@ -759,24 +756,24 @@ void LCD_request()
     if (CurrentEncoderState[0] < 28)
     {
       lcd.print("on ");
-      lcd.print(CurrentSensorState[53 + CurrentEncoderState[0] * 4]);
+      lcd.print(CurrentSensorState[54 + CurrentEncoderState[0] * 4]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[53 + CurrentEncoderState[0] * 4 + 1]);
+      lcd.print(CurrentSensorState[54 + CurrentEncoderState[0] * 4 + 1]);
       lcd.print(" off ");
-      lcd.print(CurrentSensorState[53 + CurrentEncoderState[0] * 4 + 2]);
+      lcd.print(CurrentSensorState[54 + CurrentEncoderState[0] * 4 + 2]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[53 + CurrentEncoderState[0] * 4 + 3]);
+      lcd.print(CurrentSensorState[54 + CurrentEncoderState[0] * 4 + 3]);
     }
     else if (CurrentEncoderState[0] != 30)
     {
       lcd.print("on ");
-      lcd.print(CurrentSensorState[45 + (CurrentEncoderState[0] - 28) * 4]);
+      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 28) * 4]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[45 + (CurrentEncoderState[0] - 28) * 4 + 1]);
+      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 28) * 4 + 1]);
       lcd.print(" off ");
-      lcd.print(CurrentSensorState[45 + (CurrentEncoderState[0] - 28) * 4 + 2]);
+      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 28) * 4 + 2]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[45 + (CurrentEncoderState[0] - 28) * 4 + 3]);
+      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 28) * 4 + 3]);
     }
     else
       lcd.print(DeviceMenu[0]);
@@ -796,19 +793,19 @@ void LCD_request()
     lcd.print(":");
     if (activeEncoder < 28)
     {
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 1]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 1]);
       lcd.print(" off ");
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 2]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 2]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 3]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 3]);
     }
     else
     {
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 1]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 1]);
       lcd.print(" off ");
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 2]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 2]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 3]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 3]);
     }
     break;
   case 18: // main menu
@@ -819,23 +816,23 @@ void LCD_request()
 
     if (activeEncoder < 28)
     {
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 0]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 0]);
       lcd.print(":");
       lcd.print(CurrentEncoderState[0]);
       lcd.print(" off ");
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 2]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 2]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 3]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 3]);
     }
     else
     {
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 0]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 0]);
       lcd.print(":");
       lcd.print(CurrentEncoderState[0]);
       lcd.print(" off ");
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 2]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 2]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 3]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 3]);
     }
     break;
   case 19: // main menu
@@ -846,23 +843,23 @@ void LCD_request()
 
     if (activeEncoder < 28)
     {
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 0]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 0]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 1]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 1]);
       lcd.print(" off ");
       lcd.print(CurrentEncoderState[0]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 3]);
+      lcd.print(CurrentSensorState[543 + activeEncoder * 4 + 3]);
     }
     else
     {
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 0]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 0]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 1]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 1]);
       lcd.print(" off ");
       lcd.print(CurrentEncoderState[0]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 3]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 3]);
     }
     break;
   case 20: // main menu
@@ -873,22 +870,22 @@ void LCD_request()
 
     if (activeEncoder < 28)
     {
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 0]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 0]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 1]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 1]);
       lcd.print(" off ");
-      lcd.print(CurrentSensorState[53 + activeEncoder * 4 + 2]);
+      lcd.print(CurrentSensorState[54 + activeEncoder * 4 + 2]);
       lcd.print(":");
       lcd.print(CurrentEncoderState[0]);
       lcd.print(" ");
     }
     else
     {
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 0]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 0]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 1]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 1]);
       lcd.print(" off ");
-      lcd.print(CurrentSensorState[45 + (activeEncoder - 28) * 4 + 2]);
+      lcd.print(CurrentSensorState[46 + (activeEncoder - 28) * 4 + 2]);
       lcd.print(":");
       lcd.print(CurrentEncoderState[0]);
       lcd.print(" ");
@@ -1137,10 +1134,11 @@ void setup()
   //rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   temper.begin();
   enc1.setType(TYPE2);
-  stepper1.setMaxSpeed(600);
-  stepper2.setMaxSpeed(600);
+  stepper1_Tank.setMaxSpeed(600);
+  stepper2_Led.setMaxSpeed(600);
   stepper3.setMaxSpeed(600);
   stepper4.setMaxSpeed(600);
+
   // stepper.step(STEPS*8);
   // initialize the lcd
   Wire.begin(SLAVE_ADDR);
@@ -1173,7 +1171,11 @@ void loop()
       CurrentDay = now.day();
       ZeroSensor = now.second();
       CurrentSensorState[0] = now.hour();
+      if (CurrentSensorState[0] > 23)
+        CurrentSensorState[0] = PreviousSensorState[0];
       CurrentSensorState[1] = now.minute();
+      if (CurrentSensorState[1] > 59)
+        CurrentSensorState[1] = PreviousSensorState[1];
       CurrentYear = now.year();
       CurrentMonth = now.month();
       SetupMenu[1] = String(now.year()) + "." + String(CurrentDay) + "." + String(now.month()) + "  " + String(PreviousSensorState[0]) + ":" + String(PreviousSensorState[1]);
@@ -1183,15 +1185,15 @@ void loop()
         flag = 1;
         Serial.println("ethgh");
         // if cycle start
-        if (CurrentSensorState[1] == CurrentSensorState[168] && CurrentSensorState[0] == CurrentSensorState[167] && CurrentDay == CurrentSensorState[166])
+        if (CurrentSensorState[1] == CurrentSensorState[173] && CurrentSensorState[0] == CurrentSensorState[172] && CurrentDay == CurrentSensorState[171])
         {
-          DateTime future(rtc.now() + TimeSpan(CurrentSensorState[174], CurrentSensorState[175], 0, 0));
-          CurrentSensorState[166] = future.day();
-          CurrentSensorState[167] = future.hour();
-          CurrentSensorState[168] = future.minute();
+          DateTime future(rtc.now() + TimeSpan(CurrentSensorState[179], CurrentSensorState[180], 0, 0));
+          CurrentSensorState[171] = future.day();
+          CurrentSensorState[172] = future.hour();
+          CurrentSensorState[173] = future.minute();
           TankFlag = 0;
         }
-        delay(100);
+
         temper.requestTemperatures();                      // Send the command to get temperatures
         CurrentSensorState[2] = temper.getTempCByIndex(0); // temperature
         delay(100);
@@ -1288,6 +1290,7 @@ void loop()
         CurrentYear = now.year();
         CurrentMonth = now.month();
         SetupMenu[1] = String(now.year()) + "." + String(CurrentDay) + "." + String(now.month()) + "  " + String(PreviousSensorState[0]) + ":" + String(PreviousSensorState[1]);
+        flag = 1;
       }
       else if (MenuCount == 21) // go to the Devices page
       {
@@ -1317,22 +1320,22 @@ void loop()
       else if (MenuCount == 17) // go to the Devices page
       {
         MenuCount = 18;
-        (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 0] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 0] = CurrentEncoderState[0];
+        (activeEncoder < 28) ? CurrentSensorState[54 + activeEncoder * 4 + 0] = CurrentEncoderState[0] : CurrentSensorState[46 + (activeEncoder - 28) * 4 + 0] = CurrentEncoderState[0];
       }
       else if (MenuCount == 18) // go to the Devices page
       {
         MenuCount = 19;
-        (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 1] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 1] = CurrentEncoderState[0];
+        (activeEncoder < 28) ? CurrentSensorState[54 + activeEncoder * 4 + 1] = CurrentEncoderState[0] : CurrentSensorState[46 + (activeEncoder - 28) * 4 + 1] = CurrentEncoderState[0];
       }
       else if (MenuCount == 19) // go to the Devices page
       {
 
-        (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 2] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 2] = CurrentEncoderState[0];
+        (activeEncoder < 28) ? CurrentSensorState[54 + activeEncoder * 4 + 2] = CurrentEncoderState[0] : CurrentSensorState[46 + (activeEncoder - 28) * 4 + 2] = CurrentEncoderState[0];
         MenuCount = 20;
       }
       else if (MenuCount == 20) // go to the Devices page
       {
-        (activeEncoder < 28) ? CurrentSensorState[53 + activeEncoder * 4 + 3] = CurrentEncoderState[0] : CurrentSensorState[45 + (activeEncoder - 28) * 4 + 3] = CurrentEncoderState[0];
+        (activeEncoder < 28) ? CurrentSensorState[54 + activeEncoder * 4 + 3] = CurrentEncoderState[0] : CurrentSensorState[46 + (activeEncoder - 28) * 4 + 3] = CurrentEncoderState[0];
         MenuCount = 16;
       }
       else if (MenuCount == 16 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the Devices page
@@ -1353,12 +1356,12 @@ void loop()
       }
       else if (MenuCount == 5) // back to water menu
       {
-        CurrentSensorState[175] = CurrentEncoderState[1] % 24;
-        CurrentSensorState[174] = (CurrentEncoderState[1] - CurrentSensorState[175]) / 24;
-        DateTime future(rtc.now() + TimeSpan(CurrentSensorState[174], CurrentSensorState[175], 0, 0));
-        CurrentSensorState[166] = future.day();
-        CurrentSensorState[167] = future.hour();
-        CurrentSensorState[168] = future.minute();
+        CurrentSensorState[180] = CurrentEncoderState[1] % 24;
+        CurrentSensorState[179] = (CurrentEncoderState[1] - CurrentSensorState[180]) / 24;
+        DateTime future(rtc.now() + TimeSpan(CurrentSensorState[179], CurrentSensorState[180], 0, 0));
+        CurrentSensorState[171] = future.day();
+        CurrentSensorState[172] = future.hour();
+        CurrentSensorState[173] = future.minute();
         MenuCount = 3;
         flag = 1;
         Serial.println("twelve");
@@ -1369,7 +1372,7 @@ void loop()
       }
       else if (MenuCount == 6) // go to the WaterPattern page
       {
-        CurrentSensorState[178] = CurrentEncoderState[1];
+        CurrentSensorState[183] = CurrentEncoderState[1];
         MenuCount = 3;
       }
       else if (MenuCount == 3 && CurrentEncoderState[0] == 3) // change cycle
@@ -1378,7 +1381,7 @@ void loop()
       }
       else if (MenuCount == 7) // go to the WaterPattern page
       {
-        CurrentSensorState[176] = CurrentEncoderState[1];
+        CurrentSensorState[181] = CurrentEncoderState[1];
         MenuCount = 3;
       }
 
@@ -1388,7 +1391,7 @@ void loop()
       }
       else if (MenuCount == 8) // go to the WaterPattern page
       {
-        CurrentSensorState[170] = CurrentEncoderState[1];
+        CurrentSensorState[175] = CurrentEncoderState[1];
         MenuCount = 3;
       }
 
@@ -1398,7 +1401,7 @@ void loop()
       }
       else if (MenuCount == 9) // go to the WaterPattern page
       {
-        CurrentSensorState[177] = CurrentEncoderState[1];
+        CurrentSensorState[182] = CurrentEncoderState[1];
         MenuCount = 3;
       }
 
@@ -1408,7 +1411,7 @@ void loop()
       }
       else if (MenuCount == 10) // go to the WaterPattern page
       {
-        CurrentSensorState[169] = CurrentEncoderState[1];
+        CurrentSensorState[174] = CurrentEncoderState[1];
         MenuCount = 3;
       }
 
@@ -1432,12 +1435,12 @@ void loop()
       }
       else if (MenuCount == 12) // go to the WaterPattern page
       {
-        CurrentSensorState[161] = CurrentEncoderState[1];
+        CurrentSensorState[166] = CurrentEncoderState[1];
         MenuCount = 13;
       }
       else if (MenuCount == 13) // go to the WaterPattern page
       {
-        CurrentSensorState[162] = CurrentEncoderState[1];
+        CurrentSensorState[167] = CurrentEncoderState[1];
         MenuCount = 4;
       }
 
@@ -1447,12 +1450,12 @@ void loop()
       }
       else if (MenuCount == 14) // go to the WaterPattern page
       {
-        CurrentSensorState[163] = CurrentEncoderState[1];
+        CurrentSensorState[168] = CurrentEncoderState[1];
         MenuCount = 15;
       }
       else if (MenuCount == 15) // go to the WaterPattern page
       {
-        CurrentSensorState[164] = CurrentEncoderState[1];
+        CurrentSensorState[169] = CurrentEncoderState[1];
         MenuCount = 4;
       }
       // here i change variables
@@ -1472,10 +1475,19 @@ void loop()
       LcdFlag = 1;
     }
   }
+  
   if (flag && value == 254 && FirstTimeFlag > 1)
   {
     Serial.println("Something has changed  ");
     key = 0;
+    /*
+    for (int i = 0; i < leng - 1; i++)
+    {
+      Serial.print(CurrentSensorState[i]);
+      Serial.print("/");
+    }
+    Serial.println();
+    */
     for (int i = 0; i < leng - 1; i++)
     {
       if (CurrentSensorState[i] != PreviousSensorState[i])
@@ -1492,6 +1504,7 @@ void loop()
         LcdFlag = 1;
       }
     }
+
     if (FirstTimeFlag == 1)
       Serial.println();
     Serial.print("key  ");
