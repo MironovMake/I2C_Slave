@@ -1442,8 +1442,8 @@ void loop()
       flag = 1;
 
       // чекнуть не первое ли сегодня число
-      (CurrentEncoderState[0] == 0 && CurrentEncoderState[1] == 0 && CurrentDay == 1) ? CurrentSensorState[38] = 1 : CurrentSensorState[38] = 0;
-      
+      // (CurrentEncoderState[0] == 0 && CurrentEncoderState[1] == 0 && CurrentDay == 1) ? CurrentSensorState[38] = 1 : CurrentSensorState[38] = 0;
+
       /*проверяю не проебался ли флаг из-за отключения электричества*/
       // если настала дата осуществлять орошение
       if ((CurrentSensorState[178] * 24 + CurrentSensorState[179] > 0) && checkDate(CurrentSensorState[170], CurrentSensorState[171], CurrentSensorState[172], CurrentSensorState[173]))
