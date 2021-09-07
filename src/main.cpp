@@ -17,7 +17,7 @@ int PinForMaster = 14;
 LiquidCrystal_I2C lcd(0x27, 20, 4); // set the LCD address to 0x27 for a 16 chars and 2 line display
 // количество строк в каждм подменю
 //  MenuItems[] = {2, 15, 4, 2, 7, 4, 300, 200, 200, 200, 200, 360, 250, 23, 59, 23, 59, 31, 23, 59, 23, 59, 100, 12, 31, 23, 59};
-int MenuItems[] = {2, 15, 4, 2, 5, 4, 300, 200, 200, 200, 200, 360, 250, 23, 59, 23, 59, 31, 23, 59, 23, 59, 100, 12, 32, 23, 59, 5};
+int MenuItems[] = {2, 15, 4, 2, 5, 3, 300, 200, 200, 200, 200, 360, 250, 23, 59, 23, 59, 31, 23, 59, 23, 59, 100, 12, 32, 23, 59, 5};
 // названия в меню
 String FirstMenu[] = {"Sensors", "Patterns", "Setup"};
 String SensorsInMenu[] = {"Hour", "Minute", "Temperature", "Water leaks", "Light sensor",
@@ -66,6 +66,7 @@ String ValueOfOneString;
 String ValueOfLedString;
 // MenuCount = -1;
 int MenuCount = -1;
+int previousMenuCount;
 String DeviceMenu[] = {"SOLI", "LASER1", "LASER2",
                        "VALVE1", "VALVE2", "VALVE3", "VALVE4", "VALVE5", "VALVE6",
                        "PUMP1", "PUMP2", "PUMP3", "PUMP4", "BIG_PUMP",
@@ -111,7 +112,7 @@ DallasTemperature temper(&oneWire);
 // hour, min, temper
 int NumberSpecialSensors = 3;
 // все переменные
-const int leng = 195;
+const int leng = 199;
 // pins of inputs sensors is 12
 // int InputNumber = 12
 int InputNumber = 12;
@@ -178,6 +179,8 @@ int NewSensorState[leng];
 int index[leng];
 // влаги на изменение событий, стстояние экрана
 int flag;
+int anotherCounter = 0;
+
 bool LedFlag = 0;
 bool LcdFlag;
 // ограничитель по времени для экрана
@@ -186,15 +189,17 @@ unsigned long sec;
 // wait till esp send first datesadDS
 int FirstTimeFlag = 0;
 // вемя наступления цикла полива/орошения
-int CurrentDay;
+bool after = 0;
 
+int WaterEventMonth;
+int WaterEventDay;
 int WaterEventHour;
 int WaterEventMin;
-int WaterEventDay;
 
-int IrrigatonEventHour;
-int IrrigatonEvenMin;
+int IrrigatonEventMonth;
 int IrrigatonEventDay;
+int IrrigatonEventHour;
+int IrrigatonEventMin;
 
 int adjyear;
 int adjmont;
@@ -203,9 +208,9 @@ int adjhour;
 int adjmin;
 int CurrentYear;
 int CurrentMonth;
+int CurrentDay;
+
 // метка для цикла полива/орошения
-int WateringTankFlag = 50;
-int IrrigationTankFlag = 50;
 
 int temporaryVar;
 // получение строки для подменю орошения/полива
@@ -214,13 +219,13 @@ String IrrigationMenuValue(int j)
   switch (j)
   {
   case 0: // month/day/hour/min of begining
-    ValueOfOneString = String(CurrentSensorState[170]) + "." + String(CurrentSensorState[171]) + "/" + String(CurrentSensorState[172]) + ":" + String(CurrentSensorState[173]);
+    ValueOfOneString = String(CurrentSensorState[171]) + "." + String(CurrentSensorState[170]) + "/" + String(CurrentSensorState[172]) + ":" + String(CurrentSensorState[173]);
     break;
   case 1: //cycle duration
-    ValueOfOneString = String(CurrentSensorState[179] * 24 + CurrentSensorState[180]);
+    ValueOfOneString = String(CurrentSensorState[178] * 24 + CurrentSensorState[179]);
     break;
   case 2:
-    ValueOfOneString = String(CurrentSensorState[190]);
+    ValueOfOneString = String(CurrentSensorState[194]);
     break;
   case 3:
     ValueOfOneString = String(CurrentSensorState[175]);
@@ -240,27 +245,21 @@ String WaterMenuValue(int j)
   switch (j)
   {
   case 0:
-    ValueOfOneString = String(CurrentSensorState[171]) + "." + String(CurrentSensorState[170]) + "/" + String(CurrentSensorState[172]) + ":" + String(CurrentSensorState[173]);
+    ValueOfOneString = String(CurrentSensorState[181]) + "." + String(CurrentSensorState[180]) + "/" + String(CurrentSensorState[182]) + ":" + String(CurrentSensorState[183]);
     break;
-  case 1:
-    ValueOfOneString = String(CurrentSensorState[179] * 24 + CurrentSensorState[180]); //cycle
+  case 1: //cycle duration
+    ValueOfOneString = String(CurrentSensorState[188] * 24 + CurrentSensorState[189]);
     break;
   case 2:
-    ValueOfOneString = String(CurrentSensorState[183]);
+    ValueOfOneString = String(CurrentSensorState[194]);
     break;
   case 3:
-    ValueOfOneString = String(CurrentSensorState[181]);
+    ValueOfOneString = String(CurrentSensorState[185]);
     break;
   case 4:
-    ValueOfOneString = String(CurrentSensorState[175]);
+    ValueOfOneString = String(CurrentSensorState[186]);
     break;
   case 5:
-    ValueOfOneString = String(CurrentSensorState[182]);
-    break;
-  case 6:
-    ValueOfOneString = String(CurrentSensorState[174]);
-    break;
-  case 7:
     ValueOfOneString = "";
     break;
   }
@@ -275,10 +274,10 @@ String LedMenuValue(int j)
     ValueOfLedString = String(CurrentSensorState[leng - 4]);
     break;
   case 1:
-    ValueOfLedString = String(CurrentSensorState[166]) + ":" + String(CurrentSensorState[167]);
+    ValueOfLedString = String(CurrentSensorState[190]) + ":" + String(CurrentSensorState[191]);
     break;
   case 2:
-    ValueOfLedString = String(CurrentSensorState[168]) + ":" + String(CurrentSensorState[169]);
+    ValueOfLedString = String(CurrentSensorState[192]) + ":" + String(CurrentSensorState[193]);
     break;
   case 3:
     ValueOfLedString = "";
@@ -364,7 +363,33 @@ void SensorsInit()
   }
   pinMode(OutputSensors[22], OUTPUT);
 }
-
+bool a, b, c, d;
+// bool checkDate(int month, int day, int hour, int min)
+bool checkDate(int month, int day, int hour, int min)
+{
+  bool result;
+  bool one, two, tree, four;
+  // если наступил след месяц
+  (CurrentMonth > month || CurrentMonth == 1 && month == 12) ? one = true : one = false;
+  // если наступил след день
+  (CurrentDay > day) ? two = true : two = false;
+  // если наступил след час в нужный день
+  (CurrentDay == day && CurrentSensorState[0] > hour) ? tree = true : tree = false;
+  // если наступил след час в нужный день
+  (CurrentDay == day && hour == CurrentSensorState[0] && CurrentSensorState[1] >= min) ? four = true : four = false;
+  result = (one || two || tree || four);
+  if (one && month != 0)
+  {
+    Serial.println("month changed");
+  }
+  else if (two && day != 0)
+    Serial.println("day changed");
+  else if (tree && hour != 0)
+    Serial.println("hour changed");
+  else if (four && min != 0)
+    Serial.println("min changed");
+  return result;
+}
 // проверяю все датчики
 void SensorsRequest()
 {
@@ -378,10 +403,7 @@ void SensorsRequest()
         CurrentSensorState[19 + (i - 54) / 4] = 1;
         digitalWrite(OutputSensors[(i - 54) / 4], HIGH);
         OutputFlag[(i - 54) / 4] = 1;
-        Serial.println("i - 54) / 4  ");
-        Serial.println((i - 54) / 4);
         flag = 1;
-        Serial.println("two");
       }
       else if (CurrentSensorState[i + 2] == CurrentSensorState[0] && CurrentSensorState[i + 3] == CurrentSensorState[1] && OutputFlag[(i - 54) / 4] == 1)
       {
@@ -389,7 +411,6 @@ void SensorsRequest()
         digitalWrite(OutputSensors[(i - 54) / 4], LOW);
         flag = 1;
         OutputFlag[(i - 54) / 4] = 0;
-        Serial.println("tree");
       }
     }
   }
@@ -399,174 +420,230 @@ void SensorsRequest()
     if (CurrentSensorState[NumberSpecialSensors + i] != PreviousSensorState[NumberSpecialSensors + i])
     {
       flag = 1;
-      Serial.print("four  ");
-      Serial.println(i);
     }
   }
 
   // после проверки датчиков смотрю не надо ли в контуре бака что то изменить
   // бак работает в соответствии с ТЗ
 
-  if (CurrentSensorState[178] * 24 + CurrentSensorState[179] > 0) // если установлено время орошения
+  if (CurrentSensorState[177] > 0 && CurrentSensorState[177] < 10) // если флаг в пределах нормы
   {
-    if (digitalRead(InputSensors[2]) && IrrigationTankFlag == 0) // сливаем воду перед орошением
+
+    if (digitalRead(InputSensors[2]) && CurrentSensorState[177] == 1) // сливаем воду перед орошением
     {
       digitalWrite(OutputSensors[0], HIGH); // soli on
-      IrrigationTankFlag++;
-      Serial.println("drain water");
+      CurrentSensorState[177]++;
+      Serial.println("drain water from tank  ");
+      Serial.println(CurrentSensorState[177]);
     }
-    if (!digitalRead(InputSensors[2]) && IrrigationTankFlag < 2)
+    if (!digitalRead(InputSensors[2]) && CurrentSensorState[177] < 3)
     {
       digitalWrite(OutputSensors[0], LOW); // soli off
-      IrrigationTankFlag = 2;
+      CurrentSensorState[177] = 3;
+      Serial.print("tank was empty  ");
+      Serial.println(CurrentSensorState[177]);
     }
     // fill tank
-    if (!digitalRead(InputSensors[3]) && IrrigationTankFlag == 2) // if max bobber show low level
+    if (!digitalRead(InputSensors[3]) && CurrentSensorState[177] == 3) // if max bobber show low level
     {
       digitalWrite(OutputSensors[3], HIGH); // open valve before tank
       digitalWrite(OutputSensors[9], HIGH); // pump1 on
-      Serial.println("fill tank");
-      IrrigationTankFlag++; // 3
+      Serial.print("FILLING tank  ");
+
+      CurrentSensorState[177]++; // 4
+      Serial.println(CurrentSensorState[177]);
     }
-    if (digitalRead(InputSensors[3]) && IrrigationTankFlag == 3) // when tank is fill
+    if (digitalRead(InputSensors[3]) && CurrentSensorState[177] == 4) // when tank is fill
     {
       digitalWrite(OutputSensors[9], LOW); // off pump
       digitalWrite(OutputSensors[3], LOW); // close valve
-      IrrigationTankFlag++;                //4
+      CurrentSensorState[177]++;           //4
+      Serial.print("tank is FULL  ");
+      Serial.println(CurrentSensorState[177]);
     }
     // turn reel
-    if (IrrigationTankFlag == 4)
+    if (CurrentSensorState[177] == 5)
     {
-
-      Serial.println("turn stepper");
+      Serial.print("turn stepper  ");
+      Serial.println(CurrentSensorState[177]);
       digitalWrite(enable1_Tank, LOW);
       stepper1_Tank.setCurrentPosition(0);
       stepper1_Tank.moveTo(round(CurrentSensorState[leng - 5] / 1.8));
       stepper1_Tank.runToPosition();
-      Serial.println("Start mix");
+
       digitalWrite(enable1_Tank, HIGH);
       digitalWrite(OutputSensors[10], HIGH); // start mixing
                                              // count time when I need to stop mixing
       DateTime future(rtc.now() + TimeSpan(0, 0, CurrentSensorState[175], 0));
-      IrrigatonEventDay = future.day();   //IrrigatonEventDay = future.day();
-      IrrigatonEventHour = future.hour(); //IrrigatonEventHour = future.hour();
-      IrrigatonEvenMin = future.minute(); //IrrigatonEvenMin = future.minute();
-
-      IrrigationTankFlag++; // 5
+      IrrigatonEventMonth = future.month();
+      IrrigatonEventDay = future.day();    //IrrigatonEventDay = future.day();
+      IrrigatonEventHour = future.hour();  //IrrigatonEventHour = future.hour();
+      IrrigatonEventMin = future.minute(); //IrrigatonEventMin = future.minute();
+      CurrentSensorState[177]++;           // 6
+      Serial.print("Start mix  ");
+      Serial.println(CurrentSensorState[177]);
     }
-    if (CurrentSensorState[1] == IrrigatonEvenMin && CurrentSensorState[0] == IrrigatonEventHour && CurrentDay == IrrigatonEventDay && IrrigationTankFlag == 5)
+    if (CurrentSensorState[177] == 6)
+      a = checkDate(IrrigatonEventMonth, IrrigatonEventDay, IrrigatonEventHour, IrrigatonEventMin);
+    if (a)
     {
+      a = 0;
+      Serial.print("Stop mixing  ");
+      Serial.println(CurrentSensorState[177]);
       digitalWrite(OutputSensors[10], LOW); // stop mixing
                                             //count time when i need to stop irrigation
       DateTime future(rtc.now() + TimeSpan(0, 0, CurrentSensorState[176], 0));
-      IrrigatonEventDay = future.day();   //IrrigatonEventDay = future.day();
-      IrrigatonEventHour = future.hour(); //IrrigatonEventHour = future.hour();
-      IrrigatonEvenMin = future.minute(); //IrrigatonEvenMin = future.minute();
-
+      IrrigatonEventMonth = future.month();
+      IrrigatonEventDay = future.day();      //IrrigatonEventDay = future.day();
+      IrrigatonEventHour = future.hour();    //IrrigatonEventHour = future.hour();
+      IrrigatonEventMin = future.minute();   //IrrigatonEventMin = future.minute();
       digitalWrite(OutputSensors[4], HIGH);  // open valve for irrigation
       digitalWrite(OutputSensors[11], HIGH); // water all
-      IrrigationTankFlag++;
-      // 7
+      CurrentSensorState[177]++;             //7
+      Serial.print("Begin Irrigation  ");
+      Serial.println(CurrentSensorState[177]);
     }
-    if (CurrentSensorState[1] == IrrigatonEvenMin && CurrentSensorState[0] == IrrigatonEventHour && CurrentDay == IrrigatonEventDay && IrrigationTankFlag == 6)
+    if (CurrentSensorState[177] == 7)
+      b = checkDate(IrrigatonEventMonth, IrrigatonEventDay, IrrigatonEventHour, IrrigatonEventMin);
+    if (b) // если наступил след час в день события
+           // если наступил след минута в час события соответствующего дня
     {
-      Serial.println("irrigation");
+      b = 0;
+
       digitalWrite(OutputSensors[11], LOW); // stop water
       digitalWrite(OutputSensors[4], LOW);  // close valve
-      IrrigationTankFlag++;
-      // 7
+      CurrentSensorState[177]++;            // 8
+      Serial.println("irrigation stop  ");
+      Serial.println(CurrentSensorState[177]);
     }
-    if (digitalRead(InputSensors[2]) && IrrigationTankFlag == 7) // drain water
+    if (digitalRead(InputSensors[2]) && CurrentSensorState[177] == 8) // drain water
     {
       digitalWrite(OutputSensors[0], HIGH); // soli on
-      IrrigationTankFlag++;
-      Serial.println("draun tank after irrigation");
+      CurrentSensorState[177]++;
+      Serial.println("draun tank after irrigation  ");
+      Serial.println(CurrentSensorState[177]);
+    }
+    if (!digitalRead(InputSensors[2]) && (CurrentSensorState[177] == 9 || CurrentSensorState[177] == 8)) // drain water
+    {
+      digitalWrite(OutputSensors[0], LOW); // soli on
+      CurrentSensorState[177] = 10;
+      Serial.print("I finished Irrigation tank empty  ");
+      Serial.println(CurrentSensorState[177]);
     }
   }
 
   // Орошение закончено
   // делаем полив
 
-  if (CurrentSensorState[188] * 24 + CurrentSensorState[189] > 0) // если установлено время орошения
+  if (CurrentSensorState[187] < 10 && CurrentSensorState[187] > 0) // если флаг в пределах нормы
   {
-    if (digitalRead(InputSensors[2]) && WateringTankFlag == 0) // сливаем воду перед орошением
+    if (digitalRead(InputSensors[2]) && CurrentSensorState[187] == 1) // сливаем воду перед орошением
     {
       digitalWrite(OutputSensors[0], HIGH); // soli on
-      WateringTankFlag++;
-      Serial.println("drain water");
+      CurrentSensorState[187]++;
+      Serial.print("drain water  ");
+      Serial.println(CurrentSensorState[187]);
     }
-    if (!digitalRead(InputSensors[2]) && WateringTankFlag < 2)
+    if (!digitalRead(InputSensors[2]) && CurrentSensorState[187] < 3)
     {
       digitalWrite(OutputSensors[0], LOW); // soli off
-      WateringTankFlag = 2;
+      CurrentSensorState[187] = 3;
+      Serial.print("Tank is empty  ");
+      Serial.println(CurrentSensorState[187]);
     }
     // fill tank
-    if (!digitalRead(InputSensors[3]) && WateringTankFlag == 2) // if max bobber show low level
+    if (!digitalRead(InputSensors[3]) && CurrentSensorState[187] == 3) // if max bobber show low level
     {
       digitalWrite(OutputSensors[3], HIGH); // open valve before tank
       digitalWrite(OutputSensors[9], HIGH); // pump1 on
-      Serial.println("fill tank");
-      WateringTankFlag++; // 3
+      Serial.print("fill tank  ");
+      Serial.println(CurrentSensorState[187]);
+      CurrentSensorState[187]++; // 3
     }
-    if (digitalRead(InputSensors[3]) && WateringTankFlag == 3) // when tank is fill
+    if (digitalRead(InputSensors[3]) && CurrentSensorState[187] == 4) // when tank is fill
     {
       digitalWrite(OutputSensors[9], LOW); // off pump
       digitalWrite(OutputSensors[3], LOW); // close valve
-      WateringTankFlag++;                  //4
+      CurrentSensorState[187]++;           //5
+      Serial.print("Tank is full  ");
+      Serial.println(CurrentSensorState[187]);
     }
     // turn reel
-    if (WateringTankFlag == 4)
+    if (CurrentSensorState[187] == 5)
     {
-
-      Serial.println("turn stepper");
+      Serial.print("turn stepper  ");
+      Serial.println(CurrentSensorState[187]);
       digitalWrite(enable1_Tank, LOW);
       stepper1_Tank.setCurrentPosition(0);
       stepper1_Tank.moveTo(round(CurrentSensorState[leng - 5] / 1.8));
       stepper1_Tank.runToPosition();
-      Serial.println("Start mix");
+      Serial.print("Start mix  ");
+      Serial.println(CurrentSensorState[187]);
       digitalWrite(enable1_Tank, HIGH);
-
       digitalWrite(OutputSensors[10], HIGH); // start mixing
                                              // count time when I need to stop mixing
       DateTime future(rtc.now() + TimeSpan(0, 0, CurrentSensorState[185], 0));
-      IrrigatonEventDay = future.day();   //IrrigatonEventDay = future.day();
-      IrrigatonEventHour = future.hour(); //IrrigatonEventHour = future.hour();
-      IrrigatonEvenMin = future.minute(); //IrrigatonEvenMin = future.minute();
-
-      WateringTankFlag++; // 5
+      WaterEventMonth = future.month(); //IrrigatonEventDay = future.day();
+      WaterEventDay = future.day();     //IrrigatonEventDay = future.day();
+      WaterEventHour = future.hour();   //IrrigatonEventHour = future.hour();
+      WaterEventMin = future.minute();  //IrrigatonEventMin = future.minute();
+      CurrentSensorState[187]++;        // 6
     }
-    if (CurrentSensorState[1] == IrrigatonEvenMin && CurrentSensorState[0] == IrrigatonEventHour && CurrentDay == IrrigatonEventDay && WateringTankFlag == 5)
+    if (CurrentSensorState[187] == 6)
+      c = checkDate(WaterEventMonth, WaterEventDay, WaterEventHour, WaterEventMin);
+    if (c)
     {
+      c = 0;
+      Serial.print("stop mixing  ");
+      Serial.println(CurrentSensorState[187]);
       digitalWrite(OutputSensors[10], LOW); // stop mixing
                                             //count time when i need to stop irrigation
       DateTime future(rtc.now() + TimeSpan(0, 0, CurrentSensorState[186], 0));
-      IrrigatonEventDay = future.day();   //IrrigatonEventDay = future.day();
-      IrrigatonEventHour = future.hour(); //IrrigatonEventHour = future.hour();
-      IrrigatonEvenMin = future.minute(); //IrrigatonEvenMin = future.minute();
-
+      WaterEventMonth = future.month(); //IrrigatonEventDay = future.day();
+      WaterEventDay = future.day();     //IrrigatonEventDay = future.day();
+      WaterEventHour = future.hour();   //IrrigatonEventHour = future.hour();
+      WaterEventMin = future.minute();  //IrrigatonEventMin = future.minute();
+      Serial.print("Start watering  ");
+      Serial.println(CurrentSensorState[187]);
       digitalWrite(OutputSensors[11], HIGH); // water all
       digitalWrite(OutputSensors[5], HIGH);  // open correct valve
-      WateringTankFlag++;
+      CurrentSensorState[187]++;
       // 7
     }
-    if (CurrentSensorState[1] == IrrigatonEvenMin && CurrentSensorState[0] == IrrigatonEventHour && CurrentDay == IrrigatonEventDay && WateringTankFlag == 6)
+    if (CurrentSensorState[187] == 7)
+      d = checkDate(WaterEventMonth, WaterEventDay, WaterEventHour, WaterEventMin);
+    if (d) // если наступил след час в день события
+           // если наступил след минута в час события соответствующего дня
     {
-      Serial.println("irrigation");
+      d = 0;
+      Serial.print("Stop watering  ");
+      Serial.println(CurrentSensorState[187]);
       digitalWrite(OutputSensors[11], LOW); // stop water
       digitalWrite(OutputSensors[5], LOW);  // close valve
-      WateringTankFlag++;
+      CurrentSensorState[187]++;
       // 7
     }
-    if (digitalRead(InputSensors[2]) && WateringTankFlag == 7) // drain water
+    // осушение бака после полива
+    if (digitalRead(InputSensors[2]) && CurrentSensorState[187] == 8) // drain water
     {
       digitalWrite(OutputSensors[0], HIGH); // soli on
-      WateringTankFlag++;
-      Serial.println("draun tank after irrigation");
+      CurrentSensorState[187]++;
+      Serial.print("draun tank after watering  ");
+      Serial.println(CurrentSensorState[187]);
+    }
+
+    // бак пуст и полив завершен
+    if (!digitalRead(InputSensors[2]) && (CurrentSensorState[187] == 9 || CurrentSensorState[187] == 8)) // drain water
+    {
+      digitalWrite(OutputSensors[0], LOW); // soli on
+      CurrentSensorState[187] = 10;
+      Serial.print("I drained tank after watering, tank empty  ");
+      Serial.println(CurrentSensorState[187]);
     }
   }
 
   // проверяю надо ли что то делать с контуром света
-  if (CurrentSensorState[166] == CurrentSensorState[0] && CurrentSensorState[167] == CurrentSensorState[1] && (CurrentSensorState[166] != CurrentSensorState[168] || CurrentSensorState[167] != CurrentSensorState[169]) && !LedFlag)
+  if (CurrentSensorState[190] == CurrentSensorState[0] && CurrentSensorState[191] == CurrentSensorState[1] && (CurrentSensorState[190] != CurrentSensorState[192] || CurrentSensorState[191] != CurrentSensorState[193]) && !LedFlag)
   {
     digitalWrite(OutputSensors[1], HIGH);
     while (!CurrentSensorState[9] && !CurrentSensorState[13]) // while the is obtacle and no switch
@@ -588,7 +665,7 @@ void SensorsRequest()
     LedFlag = 1;
     digitalWrite(OutputSensors[1], LOW); //laser off
   }
-  if (CurrentSensorState[168] == CurrentSensorState[0] && CurrentSensorState[169] == CurrentSensorState[1] && (CurrentSensorState[166] != CurrentSensorState[168] || CurrentSensorState[167] != CurrentSensorState[169]))
+  if (CurrentSensorState[192] == CurrentSensorState[0] && CurrentSensorState[193] == CurrentSensorState[1] && (CurrentSensorState[190] != CurrentSensorState[192] || CurrentSensorState[191] != CurrentSensorState[193]))
   {
     digitalWrite(OutputSensors[22], LOW);
     LedFlag = 0;
@@ -607,6 +684,11 @@ void LCD_request()
       lcd.setCursor(0, i);
       (CurrentEncoderState[0] == i) ? lcd.print(">") : lcd.print(" ");
       lcd.print(FirstMenu[i]);
+    }
+    if (FirstTimeFlag == 0)
+    {
+      lcd.setCursor(0, 3);
+      lcd.print("WiFi not connected");
     }
     break;
   case 0: // Меню с датчиками
@@ -687,7 +769,7 @@ void LCD_request()
       lcd.print(SetupMenu[i]);
     }
     break;
-  case 3: // Контур бака
+  case 3: // меню орошения
     lcd.clear();
     for (int i = -1; i < 3; i++)
     {
@@ -700,8 +782,8 @@ void LCD_request()
       }
       else if (CurrentEncoderState[0] + i > MenuItems[MenuCount + 1])
       {
-        lcd.print(IrrigationMenu[CurrentEncoderState[0] + i - 8]);
-        lcd.print(IrrigationMenuValue(CurrentEncoderState[0] + i - 8));
+        lcd.print(IrrigationMenu[CurrentEncoderState[0] + i - 6]);
+        lcd.print(IrrigationMenuValue(CurrentEncoderState[0] + i - 6));
       }
       else if (CurrentEncoderState[0] + i == -1)
       {
@@ -770,13 +852,13 @@ void LCD_request()
     lcd.setCursor(9, 1);
     lcd.print(CurrentEncoderState[0]);
     lcd.print(":");
-    lcd.print(CurrentSensorState[167]);
+    lcd.print(CurrentSensorState[191]);
     break;
   case 13:
     lcd.setCursor(9, 1);
     lcd.print("       ");
     lcd.setCursor(9, 1);
-    lcd.print(CurrentSensorState[166]);
+    lcd.print(CurrentSensorState[190]);
     lcd.print(":");
     lcd.print(CurrentEncoderState[0]);
     break;
@@ -786,13 +868,13 @@ void LCD_request()
     lcd.setCursor(10, 2);
     lcd.print(CurrentEncoderState[0]);
     lcd.print(":");
-    lcd.print(CurrentSensorState[169]);
+    lcd.print(CurrentSensorState[193]);
     break;
   case 15:
     lcd.setCursor(10, 2);
     lcd.print("       ");
     lcd.setCursor(10, 2);
-    lcd.print(CurrentSensorState[168]);
+    lcd.print(CurrentSensorState[192]);
     lcd.print(":");
     lcd.print(CurrentEncoderState[0]);
     break;
@@ -802,7 +884,7 @@ void LCD_request()
     {
       lcd.setCursor(0, 1 + i);
       (i == 0) ? lcd.print(">") : lcd.print(" ");
-      if (CurrentEncoderState[0] + i >= 0 && CurrentEncoderState[0] + i <= 30)
+      if (CurrentEncoderState[0] + i >= 0 && CurrentEncoderState[0] + i <= 31)
       {
         lcd.print(DeviceMenu[CurrentEncoderState[0] + i]);
       }
@@ -812,7 +894,7 @@ void LCD_request()
       }
     }
     lcd.setCursor(1, 2);
-    if (CurrentEncoderState[0] < 28)
+    if (CurrentEncoderState[0] < 29)
     {
       lcd.print("on ");
       lcd.print(CurrentSensorState[54 + CurrentEncoderState[0] * 4]);
@@ -823,21 +905,21 @@ void LCD_request()
       lcd.print(":");
       lcd.print(CurrentSensorState[54 + CurrentEncoderState[0] * 4 + 3]);
     }
-    else if (CurrentEncoderState[0] != 30)
+    else if (CurrentEncoderState[0] != 31)
     {
       lcd.print("on ");
-      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 28) * 4]);
+      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 29) * 4]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 28) * 4 + 1]);
+      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 29) * 4 + 1]);
       lcd.print(" off ");
-      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 28) * 4 + 2]);
+      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 29) * 4 + 2]);
       lcd.print(":");
-      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 28) * 4 + 3]);
+      lcd.print(CurrentSensorState[46 + (CurrentEncoderState[0] - 29) * 4 + 3]);
     }
     else
       lcd.print(DeviceMenu[0]);
     lcd.setCursor(1, 3);
-    if (CurrentEncoderState[0] != 30)
+    if (CurrentEncoderState[0] != 31)
       lcd.print(DeviceMenu[CurrentEncoderState[0] + 1]);
     else
       lcd.print(DeviceMenu[1]);
@@ -962,86 +1044,203 @@ void LCD_request()
     lcd.print(SetupMenu[2]);
     break;
   case 22: // смена месяца
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(" ");
-    lcd.print(SetupMenu[0]);
-    lcd.setCursor(0, 1);
-    lcd.print(">");
-    lcd.print(adjyear);
-    lcd.print(".");
-    lcd.print(CurrentEncoderState[0]);
-    lcd.print(".");
-    lcd.print(CurrentDay);
-    lcd.print("  ");
-    lcd.print(CurrentSensorState[0]);
-    lcd.print(":");
-    lcd.print(CurrentSensorState[1]);
-    lcd.setCursor(0, 2);
-    lcd.print(" ");
-    lcd.print(SetupMenu[2]);
+    if (previousMenuCount == 2)
+    {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print(" ");
+      lcd.print(SetupMenu[0]);
+      lcd.setCursor(0, 1);
+      lcd.print(">");
+      lcd.print(adjyear);
+      lcd.print(".");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print(".");
+      lcd.print(CurrentDay);
+      lcd.print("  ");
+      lcd.print(CurrentSensorState[0]);
+      lcd.print(":");
+      lcd.print(CurrentSensorState[1]);
+      lcd.setCursor(0, 2);
+      lcd.print(" ");
+      lcd.print(SetupMenu[2]);
+    }
+    else if (previousMenuCount == 3)
+    {
+      lcd.setCursor(0, 1);
+      lcd.print(">Start at ");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[171]);
+      lcd.print("/");
+      lcd.print(CurrentSensorState[172]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[173]);
+      lcd.print(" ");
+    }
+    else if (previousMenuCount == 26)
+    {
+      lcd.setCursor(0, 1);
+      lcd.print(">Start at ");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[181]);
+      lcd.print("/");
+      lcd.print(CurrentSensorState[182]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[183]);
+      lcd.print(" ");
+    }
     break;
   case 23: // смена часа
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(" ");
-    lcd.print(SetupMenu[0]);
-    lcd.setCursor(0, 1);
-    lcd.print(">");
-    lcd.print(adjyear);
-    lcd.print(".");
-    lcd.print(adjmont);
-    lcd.print(".");
-    lcd.print(CurrentEncoderState[0]);
-    lcd.print("  ");
-    lcd.print(CurrentSensorState[0]);
-    lcd.print(":");
-    lcd.print(CurrentSensorState[1]);
-    lcd.setCursor(0, 2);
-    lcd.print(" ");
-    lcd.print(SetupMenu[2]);
+    if (previousMenuCount == 2)
+    {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print(" ");
+      lcd.print(SetupMenu[0]);
+      lcd.setCursor(0, 1);
+      lcd.print(">");
+      lcd.print(adjyear);
+      lcd.print(".");
+      lcd.print(adjmont);
+      lcd.print(".");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print("  ");
+      lcd.print(CurrentSensorState[0]);
+      lcd.print(":");
+      lcd.print(CurrentSensorState[1]);
+      lcd.setCursor(0, 2);
+      lcd.print(" ");
+      lcd.print(SetupMenu[2]);
+    }
+    else if (previousMenuCount == 3)
+    {
+      lcd.setCursor(0, 1);
+      lcd.print(">Start at ");
+      lcd.print(CurrentSensorState[170]);
+      lcd.print(".");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print("/");
+      lcd.print(CurrentSensorState[172]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[173]);
+      lcd.print(" ");
+    }
+    else if (previousMenuCount == 26)
+    {
+      lcd.setCursor(0, 1);
+      lcd.print(">Start at ");
+      lcd.print(CurrentSensorState[180]);
+      lcd.print(".");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print("/");
+      lcd.print(CurrentSensorState[182]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[183]);
+      lcd.print(" ");
+    }
     break;
   case 24: // изменение минуты
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(" ");
-    lcd.print(SetupMenu[0]);
-    lcd.setCursor(0, 1);
-    lcd.print(">");
-    lcd.print(adjyear);
-    lcd.print(".");
-    lcd.print(adjmont);
-    lcd.print(".");
-    lcd.print(adjday);
-    lcd.print("  ");
-    lcd.print(CurrentEncoderState[0]);
-    lcd.print(":");
-    lcd.print(CurrentSensorState[1]);
-    lcd.setCursor(0, 2);
-    lcd.print(" ");
-    lcd.print(SetupMenu[2]);
+    if (previousMenuCount == 2)
+    {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print(" ");
+      lcd.print(SetupMenu[0]);
+      lcd.setCursor(0, 1);
+      lcd.print(">");
+      lcd.print(adjyear);
+      lcd.print(".");
+      lcd.print(adjmont);
+      lcd.print(".");
+      lcd.print(adjday);
+      lcd.print("  ");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print(":");
+      lcd.print(CurrentSensorState[1]);
+      lcd.setCursor(0, 2);
+      lcd.print(" ");
+      lcd.print(SetupMenu[2]);
+    }
+    else if (previousMenuCount == 3)
+    {
+      lcd.setCursor(0, 1);
+      lcd.print(">Start at ");
+      lcd.print(CurrentSensorState[170]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[171]);
+      lcd.print("/");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[173]);
+      lcd.print(" ");
+    }
+    else if (previousMenuCount == 26)
+    {
+      lcd.setCursor(0, 1);
+      lcd.print(">Start at ");
+      lcd.print(CurrentSensorState[180]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[181]);
+      lcd.print("/");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[183]);
+      lcd.print(" ");
+    }
     break;
   case 25: // change minute
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(" ");
-    lcd.print(SetupMenu[0]);
-    lcd.setCursor(0, 1);
-    lcd.print(">");
-    lcd.print(adjyear);
-    lcd.print(".");
-    lcd.print(adjmont);
-    lcd.print(".");
-    lcd.print(adjday);
-    lcd.print("  ");
-    lcd.print(adjhour);
-    lcd.print(":");
-    lcd.print(CurrentEncoderState[0]);
-    lcd.setCursor(0, 2);
-    lcd.print(" ");
-    lcd.print(SetupMenu[2]);
+    if (previousMenuCount == 2)
+    {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print(" ");
+      lcd.print(SetupMenu[0]);
+      lcd.setCursor(0, 1);
+      lcd.print(">");
+      lcd.print(adjyear);
+      lcd.print(".");
+      lcd.print(adjmont);
+      lcd.print(".");
+      lcd.print(adjday);
+      lcd.print("  ");
+      lcd.print(adjhour);
+      lcd.print(":");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.setCursor(0, 2);
+      lcd.print(" ");
+      lcd.print(SetupMenu[2]);
+    }
+    else if (previousMenuCount == 3)
+    {
+      lcd.setCursor(0, 1);
+      lcd.print(">Start at ");
+      lcd.print(CurrentSensorState[170]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[171]);
+      lcd.print("/");
+      lcd.print(CurrentSensorState[172]);
+      lcd.print(".");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print(" ");
+    }
+    else if (previousMenuCount == 26)
+    {
+      lcd.setCursor(0, 1);
+      lcd.print(">Start at ");
+      lcd.print(CurrentSensorState[180]);
+      lcd.print(".");
+      lcd.print(CurrentSensorState[181]);
+      lcd.print("/");
+      lcd.print(CurrentSensorState[182]);
+      lcd.print(".");
+      lcd.print(CurrentEncoderState[0]);
+      lcd.print(" ");
+    }
     break;
-  case 26: // изменение минуты
+  case 26: // меню полива
+
     lcd.clear();
     for (int i = -1; i < 3; i++)
     {
@@ -1054,8 +1253,8 @@ void LCD_request()
       }
       else if (CurrentEncoderState[0] + i > MenuItems[MenuCount + 1])
       {
-        lcd.print(WaterMenu[CurrentEncoderState[0] + i - 8]);
-        lcd.print(WaterMenuValue(CurrentEncoderState[0] + i - 8));
+        lcd.print(WaterMenu[CurrentEncoderState[0] + i - 6]);
+        lcd.print(WaterMenuValue(CurrentEncoderState[0] + i - 6));
       }
       else if (CurrentEncoderState[0] + i == -1)
       {
@@ -1063,6 +1262,7 @@ void LCD_request()
         lcd.print(WaterMenuValue(MenuItems[MenuCount + 1]));
       }
     }
+
     break;
   }
 }
@@ -1095,17 +1295,27 @@ void receiveEvent()
       // i increase value ig degree becouse i afraid its gona be too big
       for (int i = 0; i < number; i = i + 2)
       {
-        CurrentSensorState[NewSensorState[i]] = NewSensorState[i + 1];
-        Serial.print(NewSensorState[i]);
-        Serial.print("/");
-        Serial.print(CurrentSensorState[NewSensorState[i]]);
-        Serial.print(" ");
-        if (FirstTimeFlag == 1)
-          PreviousSensorState[NewSensorState[i]] = CurrentSensorState[NewSensorState[i]];
+        if (FirstTimeFlag != 1)
+        {
+          CurrentSensorState[NewSensorState[i]] = NewSensorState[i + 1];
+          Serial.print(NewSensorState[i]);
+          Serial.print("/");
+          Serial.print(CurrentSensorState[NewSensorState[i]]);
+          Serial.print(" ");
+        }
+        else if (FirstTimeFlag == 1 && NewSensorState[i] > 14)
+        {
+          CurrentSensorState[NewSensorState[i]] = NewSensorState[i + 1];
+          Serial.print(NewSensorState[i]);
+          Serial.print(".");
+          Serial.print(CurrentSensorState[NewSensorState[i]]);
+          Serial.print(" ");
+        }
       }
       Serial.println();
       Serial.println("I've get data");
       FirstTimeFlag++;
+      after = 0;
       //flag = 0;
     }
     else if (FirstTimeFlag == 0)
@@ -1121,7 +1331,6 @@ void receiveEvent()
 // Отправка данных мастеру
 void requestEvent()
 {
-  digitalWrite(PinForMaster, LOW);
   // Define a byte to hold data
   byte bval;
   // Cycle through data
@@ -1151,9 +1360,15 @@ void requestEvent()
     break;
   }
   Wire.write(bval);
+  delay(10);
+  digitalWrite(PinForMaster, LOW);
+  Serial.print(bval);
+  Serial.print("|");
   bcount = bcount + 1;
   if (bcount > key)
+  {
     bcount = 0;
+  }
 }
 
 void setup()
@@ -1173,13 +1388,33 @@ void setup()
   lcd.print("  PLEASE  WAIT");
   // delay(2000);
   LCD_request();
+
+  /* CurrentSensorState[170] = 9;//month
+  CurrentSensorState[171] = 5;//day
+  CurrentSensorState[172] = 0;//hour
+  CurrentSensorState[173] = 0; // date min
+  CurrentSensorState[175] = 1;
+  CurrentSensorState[176] = 1;
+  CurrentSensorState[177] = 0;
+  CurrentSensorState[178] = 2;
+
+  CurrentSensorState[180] = 9; //month
+  CurrentSensorState[181] = 5; //day
+  CurrentSensorState[182] = 0; //hour
+  CurrentSensorState[183] = 0; // date min
+  CurrentSensorState[185] = 1;
+  CurrentSensorState[186] = 1;
+  CurrentSensorState[187] = 0;
+  CurrentSensorState[188] = 2;
+  CurrentSensorState[190] = 180;
+    */
 }
-bool after = 0;
+
 bool trans;
 void loop()
 {
   // если не осущевтвляется общение с мастером каждые 0,2 секунды проверять все датчики
-  if (millis() - sec > 200 && value == 254)
+  if (millis() - sec > 200 && (value == 254 || FirstTimeFlag == 0))
   {
     sec = millis();
     DateTime now = rtc.now();
@@ -1189,7 +1424,7 @@ void loop()
     if (CurrentSensorState[0] > 23)
       CurrentSensorState[0] = PreviousSensorState[0];
     CurrentSensorState[1] = now.minute();
-    if (FirstTimeFlag > 1)
+    if (CurrentSensorState[0] != 66 && CurrentSensorState[1] != 66)
       after = 1;
     if (CurrentSensorState[1] > 59)
     {
@@ -1203,23 +1438,52 @@ void loop()
     // каждую минуту проверять температуру и время событий
     if (CurrentSensorState[1] != PreviousSensorState[1] && CurrentSensorState[1] < 60 && CurrentSensorState[1] > -1 && ZeroSensor < 60)
     {
+      digitalWrite(PinForMaster, LOW);
       flag = 1;
+
+      // чекнуть не первое ли сегодня число
+      (CurrentEncoderState[0] == 0 && CurrentEncoderState[1] == 0 && CurrentDay == 1) ? CurrentSensorState[38] = 1 : CurrentSensorState[38] = 0;
+      
+      /*проверяю не проебался ли флаг из-за отключения электричества*/
       // если настала дата осуществлять орошение
-      if (CurrentSensorState[1] == CurrentSensorState[173] && CurrentSensorState[0] == CurrentSensorState[174] && CurrentDay == CurrentSensorState[175])
+      if ((CurrentSensorState[178] * 24 + CurrentSensorState[179] > 0) && checkDate(CurrentSensorState[170], CurrentSensorState[171], CurrentSensorState[172], CurrentSensorState[173]))
       {
+        Serial.println();
+        Serial.print("date is ");
+        Serial.print(CurrentSensorState[170]);
+        Serial.print(".");
+        Serial.print(CurrentSensorState[171]);
+        Serial.print(" / ");
+        Serial.print(CurrentSensorState[172]);
+        Serial.print(":");
+        Serial.println(CurrentSensorState[173]);
+        Serial.print("now  is ");
+        Serial.print(CurrentSensorState[170]);
+        Serial.print(".");
+        Serial.print(CurrentDay);
+        Serial.print(" / ");
+        Serial.print(CurrentSensorState[0]);
+        Serial.print(":");
+        Serial.println(CurrentSensorState[1]);
         DateTime future(rtc.now() + TimeSpan(CurrentSensorState[178], CurrentSensorState[179], 0, 0));
-        CurrentSensorState[175] = future.day();
-        CurrentSensorState[174] = future.hour();
+        CurrentSensorState[170] = future.month();
+        CurrentSensorState[171] = future.day();
+        CurrentSensorState[172] = future.hour();
         CurrentSensorState[173] = future.minute();
-        IrrigationTankFlag = 0;
+        CurrentSensorState[177] = 1;
+        Serial.print("Its time for Irrigation  ");
+        Serial.println(CurrentSensorState[177]);
       }
-      if (CurrentSensorState[1] == CurrentSensorState[183] && CurrentSensorState[0] == CurrentSensorState[184] && CurrentDay == CurrentSensorState[185])
+      if ((CurrentSensorState[188] * 24 + CurrentSensorState[189] > 0) && checkDate(CurrentSensorState[180], CurrentSensorState[181], CurrentSensorState[182], CurrentSensorState[183]))
       {
-        DateTime future(rtc.now() + TimeSpan(CurrentSensorState[178], CurrentSensorState[179], 0, 0));
-        CurrentSensorState[185] = future.day();
-        CurrentSensorState[184] = future.hour();
+        DateTime future(rtc.now() + TimeSpan(CurrentSensorState[188], CurrentSensorState[189], 0, 0));
+        CurrentSensorState[180] = future.month();
+        CurrentSensorState[181] = future.day();
+        CurrentSensorState[182] = future.hour();
         CurrentSensorState[183] = future.minute();
-        WateringTankFlag = 0;
+        CurrentSensorState[187] = 1;
+        Serial.print("Its time for Watering  ");
+        Serial.println(CurrentSensorState[187]);
       }
       temper.requestTemperatures();                      // Send the command to get temperatures
       CurrentSensorState[2] = temper.getTempCByIndex(0); // temperature
@@ -1268,9 +1532,8 @@ void loop()
   // если нажата кнопка энкодера
   if (enc1.isPress())
   {
-
     // скачим по страницам экрана
-    if (MenuCount == 3 || MenuCount == 4 || MenuCount == 16)
+    if (MenuCount == 3 || MenuCount == 4 || MenuCount == 16 || MenuCount == 26)
     {
       activeEncoder = CurrentEncoderState[0];
     }
@@ -1281,6 +1544,7 @@ void loop()
     if (MenuCount == -1) // go out from first page
     {
       MenuCount = CurrentEncoderState[1];
+      previousMenuCount = MenuCount;
     }
     else if (MenuCount == 2 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go out from first page
     {
@@ -1290,7 +1554,7 @@ void loop()
     {
       MenuCount = 21;
     }
-    else if (MenuCount == 21) // go to the Devices page
+    else if (MenuCount == 21 && previousMenuCount == 2) // go to the Devices page
     {
       MenuCount++;
       adjyear = CurrentEncoderState[1] + 2021;
@@ -1299,18 +1563,44 @@ void loop()
     {
       MenuCount++;
       adjmont = CurrentEncoderState[1];
+      if (previousMenuCount == 3)
+      {
+        CurrentSensorState[170] = adjmont;
+      }
+      else if (previousMenuCount == 26)
+      {
+        CurrentSensorState[180] = adjmont;
+      }
     }
     else if (MenuCount == 23) // go to the Devices page
     {
       MenuCount++;
+
       adjday = CurrentEncoderState[1];
+      if (previousMenuCount == 3)
+      {
+        CurrentSensorState[171] = adjday;
+      }
+      else if (previousMenuCount == 26)
+      {
+        CurrentSensorState[181] = adjday;
+      }
     }
     else if (MenuCount == 24) // go to the Devices page
     {
+
       MenuCount++;
       adjhour = CurrentEncoderState[1];
+      if (previousMenuCount == 3)
+      {
+        CurrentSensorState[172] = adjhour;
+      }
+      else if (previousMenuCount == 26)
+      {
+        CurrentSensorState[182] = adjhour;
+      }
     }
-    else if (MenuCount == 25) // go to the Devices page
+    else if (MenuCount == 25 && previousMenuCount == 2) // go to the Devices page
     {
       MenuCount = 2;
       adjmin = CurrentEncoderState[1];
@@ -1325,11 +1615,6 @@ void loop()
       SetupMenu[1] = String(now.year()) + "." + String(CurrentDay) + "." + String(now.month()) + "  " + String(PreviousSensorState[0]) + ":" + String(PreviousSensorState[1]);
       flag = 1;
     }
-    else if (MenuCount == 21) // go to the Devices page
-    {
-      MenuCount++;
-      adjyear = CurrentEncoderState[1];
-    }
     else if (MenuCount == 0 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the first page
     {
       MenuCount = -1;
@@ -1338,26 +1623,9 @@ void loop()
     {
       MenuCount = -1;
     }
-    else if (MenuCount == 1 && CurrentEncoderState[0] == 0) // go to the Irrigation
-    {
-      MenuCount = 3;
-    }
-    else if (MenuCount == 1 && CurrentEncoderState[0] == 1) // go to the Led page
-    {
-      MenuCount = 4;
-    }
     else if (MenuCount == 1 && CurrentEncoderState[0] == 2) // go to the Devices page
     {
       MenuCount = 16;
-    }
-    else if (MenuCount == 1 && CurrentEncoderState[0] == 3) // go to the Water page
-    {
-      MenuCount = 26;
-    }
-    else if (MenuCount == 26 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the Pattern page
-    {
-
-      MenuCount = 1;
     }
     else if (MenuCount == 16 && CurrentEncoderState[0] != MenuItems[MenuCount + 1]) // go to the Devices page
     {
@@ -1375,7 +1643,6 @@ void loop()
     }
     else if (MenuCount == 19) // go to the Devices page
     {
-
       (activeEncoder < 28) ? CurrentSensorState[54 + activeEncoder * 4 + 2] = CurrentEncoderState[0] : CurrentSensorState[46 + (activeEncoder - 28) * 4 + 2] = CurrentEncoderState[0];
       MenuCount = 20;
     }
@@ -1393,80 +1660,167 @@ void loop()
     {
       MenuCount = -1;
     }
-    else if (MenuCount == 3 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // go to the Pattern page
+
+    /* параметры контура орошения MenuCount = 3;*/
+
+    else if (MenuCount == 1 && CurrentEncoderState[0] == 0) // переход в меню орошения
+    {
+      MenuCount = 3;
+      previousMenuCount = MenuCount;
+    }
+    else if (MenuCount == 3 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // возврат в меню шаблонов
     {
       MenuCount = 1;
     }
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 1) // change cycle
+    else if (MenuCount == 3 && CurrentEncoderState[0] == 0) // возврат в меню шаблонов
+    {
+      MenuCount = 22;
+    }
+    else if (MenuCount == 25 && previousMenuCount == 3) // go to the Devices page
+    {
+      MenuCount = 3;
+      adjmin = CurrentEncoderState[1];
+      CurrentSensorState[170] = adjmont;
+      CurrentSensorState[171] = adjday;
+      CurrentSensorState[172] = adjhour;
+      CurrentSensorState[173] = adjmin;
+      Serial.print("PreviousSensorState[173]");
+      Serial.println(PreviousSensorState[173]);
+      flag = 1;
+    }
+    else if (MenuCount == 3 && CurrentEncoderState[0] == 1) // меняю длительность
     {
       MenuCount = 5;
     }
-    else if (MenuCount == 5) // back to water menu
+    else if (MenuCount == 5 && previousMenuCount == 3) // back to water menu
     {
-      CurrentSensorState[188] = CurrentEncoderState[1] % 24;
-      CurrentSensorState[189] = (CurrentEncoderState[1] - CurrentSensorState[188]) / 24;
-      DateTime future(rtc.now() + TimeSpan(CurrentSensorState[179], CurrentSensorState[180], 0, 0));
-      CurrentSensorState[181] = future.day();
-      CurrentSensorState[182] = future.hour();
-      CurrentSensorState[183] = future.minute();
+      CurrentSensorState[179] = CurrentEncoderState[1] % 24;
+      CurrentSensorState[178] = (CurrentEncoderState[1] - CurrentSensorState[178]) / 24;
+      DateTime future(rtc.now() + TimeSpan(CurrentSensorState[178], CurrentSensorState[179], 0, 0));
+      CurrentSensorState[171] = future.day();
+      CurrentSensorState[172] = future.hour();
+      CurrentSensorState[173] = future.minute();
       MenuCount = 3;
       flag = 1;
       Serial.println("twelve");
     }
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 2) // change cycle
+    else if (MenuCount == 3 && CurrentEncoderState[0] == 2) // меняю угол поворота
     {
       MenuCount = 6;
     }
-    else if (MenuCount == 6) // go to the WaterPattern page
+    else if (MenuCount == 6 && previousMenuCount == 3)
     {
-      CurrentSensorState[183] = CurrentEncoderState[1];
+      CurrentSensorState[194] = CurrentEncoderState[1];
       MenuCount = 3;
+      flag = 1;
     }
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 3) // change cycle
+    else if (MenuCount == 3 && CurrentEncoderState[0] == 3) // время перемешивания
     {
       MenuCount = 7;
     }
-    else if (MenuCount == 7) // go to the WaterPattern page
-    {
-      CurrentSensorState[181] = CurrentEncoderState[1];
-      MenuCount = 3;
-    }
-
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 4) // change cycle
-    {
-      MenuCount = 8;
-    }
-    else if (MenuCount == 8) // go to the WaterPattern page
+    else if (MenuCount == 7 && previousMenuCount == 3) // go to the WaterPattern page
     {
       CurrentSensorState[175] = CurrentEncoderState[1];
       MenuCount = 3;
+      flag = 1;
     }
 
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 5) // change cycle
+    else if (MenuCount == 3 && CurrentEncoderState[0] == 4) // длительность полива
     {
-      MenuCount = 9;
+      MenuCount = 8;
     }
-    else if (MenuCount == 9) // go to the WaterPattern page
+    else if (MenuCount == 8 && previousMenuCount == 3) // go to the WaterPattern page
     {
-      CurrentSensorState[182] = CurrentEncoderState[1];
+      CurrentSensorState[176] = CurrentEncoderState[1];
       MenuCount = 3;
+      flag = 1;
     }
-
-    else if (MenuCount == 3 && CurrentEncoderState[0] == 6) // change cycle
+    /* параметры контура полива MenuCount = 26;*/
+    else if (MenuCount == 1 && CurrentEncoderState[0] == 3) // go to the Water page
     {
-      MenuCount = 10;
+      MenuCount = 26;
+      previousMenuCount = MenuCount;
     }
-    else if (MenuCount == 10) // go to the WaterPattern page
-    {
-      CurrentSensorState[174] = CurrentEncoderState[1];
-      MenuCount = 3;
-    }
-
-    else if (MenuCount == 4 && CurrentEncoderState[0] == 3) // change cycle
+    else if (MenuCount == 26 && CurrentEncoderState[0] == MenuItems[MenuCount + 1]) // возврат в меню шаблонов
     {
       MenuCount = 1;
     }
-    else if (MenuCount == 4 && CurrentEncoderState[0] == 0) // go to the WaterPattern page
+    else if (MenuCount == 26 && CurrentEncoderState[0] == 0) // возврат в меню шаблонов
+    {
+      MenuCount = 22;
+    }
+    else if (MenuCount == 25 && previousMenuCount == 26) // go to the Devices page
+    {
+      MenuCount = 26;
+      adjmin = CurrentEncoderState[1];
+      CurrentSensorState[180] = adjmont;
+      CurrentSensorState[181] = adjday;
+      CurrentSensorState[182] = adjhour;
+      CurrentSensorState[183] = adjmin;
+      Serial.print("PreviousSensorState[173]");
+      Serial.println(PreviousSensorState[173]);
+
+      flag = 1;
+    }
+    else if (MenuCount == 26 && CurrentEncoderState[0] == 1) // меняю длительность
+    {
+      MenuCount = 5;
+    }
+    else if (MenuCount == 5 && previousMenuCount == 26) // back to water menu
+    {
+      CurrentSensorState[189] = CurrentEncoderState[1] % 24;
+      CurrentSensorState[188] = (CurrentEncoderState[1] - CurrentSensorState[188]) / 24;
+      DateTime future(rtc.now() + TimeSpan(CurrentSensorState[188], CurrentSensorState[189], 0, 0));
+      CurrentSensorState[181] = future.day();
+      CurrentSensorState[182] = future.hour();
+      CurrentSensorState[183] = future.minute();
+      MenuCount = 26;
+      flag = 1;
+      Serial.println("twelve");
+    }
+    else if (MenuCount == 26 && CurrentEncoderState[0] == 2) // меняю угол поворота
+    {
+      MenuCount = 6;
+    }
+    else if (MenuCount == 6 && previousMenuCount == 26)
+    {
+      CurrentSensorState[194] = CurrentEncoderState[1];
+      MenuCount = 26;
+      flag = 1;
+    }
+    else if (MenuCount == 26 && CurrentEncoderState[0] == 3) // время перемешивания
+    {
+      MenuCount = 7;
+    }
+    else if (MenuCount == 7 && previousMenuCount == 26) // go to the WaterPattern page
+    {
+      CurrentSensorState[185] = CurrentEncoderState[1];
+      MenuCount = 26;
+      flag = 1;
+    }
+
+    else if (MenuCount == 26 && CurrentEncoderState[0] == 4) // длительность полива
+    {
+      MenuCount = 8;
+    }
+    else if (MenuCount == 8 && previousMenuCount == 26) // go to the WaterPattern page
+    {
+      CurrentSensorState[186] = CurrentEncoderState[1];
+      MenuCount = 26;
+      flag = 1;
+    }
+
+    /* параметры контура света MenuCount = 4;*/
+
+    else if (MenuCount == 1 && CurrentEncoderState[0] == 1) // переход в меню настройки контура освещения
+    {
+      MenuCount = 4;
+    }
+    else if (MenuCount == 4 && CurrentEncoderState[0] == 3) // вернуться в меню шаблонов
+    {
+      MenuCount = 1;
+    }
+    else if (MenuCount == 4 && CurrentEncoderState[0] == 0) // поменять дистанцию на которую отъедет мотор
     {
       MenuCount = 11;
     }
@@ -1474,36 +1828,37 @@ void loop()
     {
       CurrentSensorState[leng - 4] = CurrentEncoderState[1];
       MenuCount = 4;
+      flag = 1;
     }
-
-    else if (MenuCount == 4 && CurrentEncoderState[0] == 1) // go to the WaterPattern page
+    else if (MenuCount == 4 && CurrentEncoderState[0] == 1) // изменить время включения света
     {
       MenuCount = 12;
     }
-    else if (MenuCount == 12) // go to the WaterPattern page
+    else if (MenuCount == 12) // меняю часы включения света
     {
-      CurrentSensorState[166] = CurrentEncoderState[1];
+      CurrentSensorState[190] = CurrentEncoderState[1];
       MenuCount = 13;
     }
-    else if (MenuCount == 13) // go to the WaterPattern page
+    else if (MenuCount == 13) // меняю минуты включения света
     {
-      CurrentSensorState[167] = CurrentEncoderState[1];
+      CurrentSensorState[191] = CurrentEncoderState[1];
       MenuCount = 4;
+      flag = 1;
     }
-
-    else if (MenuCount == 4 && CurrentEncoderState[0] == 2) // go to the WaterPattern page
+    else if (MenuCount == 4 && CurrentEncoderState[0] == 2) // меняю время выключения света
     {
       MenuCount = 14;
     }
-    else if (MenuCount == 14) // go to the WaterPattern page
+    else if (MenuCount == 14) // меняю часы выключения света
     {
-      CurrentSensorState[168] = CurrentEncoderState[1];
+      CurrentSensorState[192] = CurrentEncoderState[1];
       MenuCount = 15;
     }
-    else if (MenuCount == 15) // go to the WaterPattern page
+    else if (MenuCount == 15) // меняю минуты выключения света
     {
-      CurrentSensorState[169] = CurrentEncoderState[1];
+      CurrentSensorState[193] = CurrentEncoderState[1];
       MenuCount = 4;
+      flag = 1;
     }
     // here i change variables
     if (CurrentEncoderState[0] > MenuItems[MenuCount])
@@ -1515,7 +1870,7 @@ void loop()
     else if (MenuCount == -1)
       CurrentEncoderState[0] = 0;
 
-    if (MenuCount == 3 || MenuCount == 4 || MenuCount == 16)
+    if (MenuCount == 3 || MenuCount == 4 || MenuCount == 16 || MenuCount == 26)
     {
       CurrentEncoderState[0] = activeEncoder;
     }
@@ -1525,18 +1880,20 @@ void loop()
   }
   // если гдет поднялся flag, значит какое то значение поменяло свое состояние
   // и надо об этом сказать мастеру
-  if (flag && value == 254 && FirstTimeFlag > 1 && after)
+  if ((flag && value == 254 && FirstTimeFlag > 1 && after) || (flag && FirstTimeFlag == 0 && after))
   {
     after = 0;
     Serial.println("Something has changed  ");
     key = 0;
     for (int i = 0; i < leng - 1; i++)
     {
-      if (CurrentSensorState[i] != PreviousSensorState[i])
+      if (CurrentSensorState[i] != PreviousSensorState[i] && i != 174 && i != 184 || (anotherCounter < 4 && i < 15))
       {
         Serial.print("i  ");
         Serial.print(i);
-        Serial.print("  SensorState  ");
+        Serial.print("  before/after  ");
+        Serial.print(PreviousSensorState[i]);
+        Serial.print("/");
         Serial.println(CurrentSensorState[i]);
         PreviousSensorState[i] = CurrentSensorState[i];
         index[key] = i;
@@ -1545,12 +1902,13 @@ void loop()
         trans = 1;
       }
     }
-    if (FirstTimeFlag == 1)
-      Serial.println("FirstTime  ");
+    if (FirstTimeFlag > 1)
+      anotherCounter++;
     key = key * 2 + 1;
-    Serial.print("key  ");
-    Serial.println(key);
-
+    Serial.print("key/value  ");
+    Serial.print(key);
+    Serial.print("/");
+    Serial.println(value);
     flag = 0;
   }
   // обновляем экран
@@ -1561,9 +1919,12 @@ void loop()
     TimeFromBegin = millis();
   }
   // подаем еденичку мастеру, чтоб он нас спросил, то изменилось
-  if (key > 1 && value == 254 && trans)
+  if (key > 1 && value == 254 && trans && FirstTimeFlag > 0)
   {
+    Serial.println("Master I have something to say");
     digitalWrite(PinForMaster, HIGH);
     trans = 0;
+    delay(600);
+    digitalWrite(PinForMaster, LOW);
   }
 }
